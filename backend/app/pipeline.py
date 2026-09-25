@@ -23,6 +23,9 @@ from .models import (
     StandardAnswer,
     SubmissionAttempt,
 )
+from .llm import cover_letter as llm_cl
+from .llm.ollama import LLMUnavailable, OllamaClient
+from .llm.settings import get_llm_config
 from .prep import answers as ans
 from .prep import packet as pk
 from .security.crypto import EncryptedFileStore
@@ -83,7 +86,29 @@ def match_jobs(db: Session, profile: Profile, actor: str = "worker") -> dict:
 
 
 # ------------------------------------------------------------------ preparation
-def prepare(db: Session, app: Application, actor: str, questions: list[dict] | None = None) -> Packet:
+def _maybe_llm_letter(db: Session, app: Application, facts: list[Fact], template_letter: list[dict],
+                      matched_skill_ids: dict, client=None) -> tuple[list[dict], dict]:  # noqa: ANN001
+    """Replace the template letter body with verified local-LLM sentences when enabled. Any failure -> template."""
+    cfg = get_llm_config(db)
+    if not cfg["enabled"]:
+        return template_letter, {"generator": "template"}
+    title, employer, _ = pk.safe_job_fields(app.job)
+    try:
+        client = client or OllamaClient()
+        body, info = llm_cl.draft(client, cfg["model"], title, employer, sorted(matched_skill_ids), facts)
+    except LLMUnavailable as e:
+        return template_letter, {"generator": "template", "fallback_reason": str(e)[:300]}
+    if len(body) < llm_cl.MIN_SENTENCES:
+        return template_letter, {**info, "generator": "template",
+                                 "fallback_reason": f"only {len(body)} sentence(s) passed verification"}
+    # Keep the template's greeting, opening line (job fields only) and closing/signature. Swap the body.
+    head = [u for u in template_letter[:2]]
+    tail = [u for u in template_letter if u.get("template") and u["text"].startswith(("Thank you", "Sincerely"))] + \
+           [template_letter[-1]]
+    return head + body + tail, info
+
+
+def prepare(db: Session, app: Application, actor: str, questions: list[dict] | None = None, llm_client=None) -> Packet:  # noqa: ANN001
     if app.state not in ("MATCHED", "PREPARED", "NEEDS_REVIEW"):
         raise ValueError(f"cannot prepare from state {app.state}")
     profile = db.get(Profile, app.profile_id)
@@ -95,6 +120,7 @@ def prepare(db: Session, app: Application, actor: str, questions: list[dict] | N
 
     resume_lines = pk.build_resume_lines(profile, facts, list(matched_skill_ids))
     letter, flags = pk.build_cover_letter(profile, app.job, facts, matched_skill_ids)
+    letter, letter_info = _maybe_llm_letter(db, app, facts, letter, matched_skill_ids, llm_client)
     problems = pk.verify_provenance(resume_lines, approved_ids) + pk.verify_provenance(letter, approved_ids)
     if problems:  # construction bug guard: never persist unverifiable material
         audit.record(db, actor, "packet.provenance_failed", "application", app.id, {"problems": problems[:5]})
@@ -124,12 +150,13 @@ def prepare(db: Session, app: Application, actor: str, questions: list[dict] | N
                     resume_lines=resume_lines, cover_letter=letter,
                     answers=drafted + [{"question": n, "key": "review_note", "required": True, "sensitive": False,
                                         "status": "NEEDS_REVIEW", "source": None, "note": n} for n in review_notes],
-                    unsupported_count=len(blocking) + len(review_notes))
+                    unsupported_count=len(blocking) + len(review_notes), generation={"cover_letter": letter_info})
     db.add(packet)
     db.flush()
     audit.record(db, actor, "packet.generated", "application", app.id,
                  {"packet_id": packet.id, "version": packet.version, "resume_sha256": digest,
-                  "unsupported": packet.unsupported_count})
+                  "unsupported": packet.unsupported_count, "letter_generator": letter_info.get("generator"),
+                  "letter_dropped": len(letter_info.get("dropped", []))})
     if app.state != "PREPARED":
         transition(db, app, "PREPARED", actor, "packet generated")
     if packet.unsupported_count:

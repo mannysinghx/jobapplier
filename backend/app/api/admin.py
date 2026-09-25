@@ -5,7 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import audit, controls, privacy
+from ..config import get_settings
 from ..db import get_db
+from ..llm.ollama import LLMUnavailable, OllamaClient, host_is_local
+from ..llm.settings import get_llm_config, set_llm_config
 from ..models import AuditEvent, User
 from ..security import auth
 from ..security.auth import actor, current_user, require_admin
@@ -69,6 +72,34 @@ class RetentionIn(BaseModel):
 @router.put("/controls/retention")
 def put_retention(body: RetentionIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     return privacy.set_retention(db, body.model_dump(exclude_none=True), actor(user))
+
+
+@router.get("/llm")
+def llm_status(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    s = get_settings()
+    out = {**get_llm_config(db), "base_url": s.llm_base_url, "endpoint_is_local": host_is_local(s.llm_base_url),
+           "reachable": False, "models": [], "error": None}
+    try:
+        out["models"] = OllamaClient().local_models()
+        out["reachable"] = True
+    except LLMUnavailable as e:
+        out["error"] = str(e)
+    return out
+
+
+class LLMIn(BaseModel):
+    enabled: bool
+    model: str = Field(min_length=1, max_length=200)
+
+
+@router.put("/llm")
+def llm_update(body: LLMIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    if body.enabled:
+        try:
+            OllamaClient().ensure_local(body.model)
+        except LLMUnavailable as e:
+            raise HTTPException(409, str(e)) from e
+    return set_llm_config(db, body.enabled, body.model, actor(user))
 
 
 @router.get("/audit")

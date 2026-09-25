@@ -24,6 +24,7 @@ Project license: Apache-2.0.
 | prometheus_client | 0.26.0 | Apache-2.0 AND BSD-2-Clause | |
 | PyYAML | 6.0.3 | MIT | |
 | python-multipart | 0.0.32 | Apache-2.0 | |
+| snowballstemmer | 3.1.1 | BSD-3-Clause | Porter2 stemming for the cover-letter claim verifier |
 
 ## Backend (dev/test)
 | Package | Version | License |

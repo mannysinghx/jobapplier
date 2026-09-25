@@ -252,6 +252,8 @@ class Packet(Base):
     cover_letter: Mapped[list] = mapped_column(JSON, default=list)  # [{text, fact_ids, answer_ids, job_fields}]
     answers: Mapped[list] = mapped_column(JSON, default=list)  # [{question, key, answer, status, evidence}]
     unsupported_count: Mapped[int] = mapped_column(Integer, default=0)
+    # How materials were generated, e.g. {"cover_letter": {"generator": "ollama:qwen3.6:35b", "kept": 4, "dropped": [...]}}
+    generation: Mapped[dict] = mapped_column(JSON, default=dict)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = _ts()
 

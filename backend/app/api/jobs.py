@@ -202,7 +202,7 @@ def application_detail(app_id: int, db: Session = Depends(get_db), user: User = 
         "packet": None if packet is None else {
             "id": packet.id, "version": packet.version, "approved_at": packet.approved_at,
             "resume_lines": packet.resume_lines, "cover_letter": packet.cover_letter, "answers": resolved,
-            "unsupported_count": packet.unsupported_count},
+            "unsupported_count": packet.unsupported_count, "generation": packet.generation or {}},
         "handoffs": [{"id": h.id, "reasons": h.reasons, "status": h.status, "created_at": h.created_at}
                      for h in db.execute(select(HandoffTask).where(HandoffTask.application_id == a.id)).scalars()],
         "attempts": [{"id": s.id, "adapter": s.adapter, "status": s.status, "confirmation_id": s.confirmation_id,

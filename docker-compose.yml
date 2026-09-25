@@ -20,6 +20,8 @@ x-app-env: &app-env
   JA_MFA_REQUIRED: "true"
   JA_CLAMAV_HOST: ${JA_CLAMAV_HOST:-}
   JA_CORS_ORIGINS: '["http://localhost:5180"]'
+  # Local Ollama on the host (cover-letter drafting; off until enabled in the UI). Non-local endpoints are refused.
+  JA_LLM_BASE_URL: ${JA_LLM_BASE_URL:-http://host.docker.internal:11434}
 
 services:
   db:
@@ -45,6 +47,7 @@ services:
   api:
     build: ./backend
     environment: *app-env
+    extra_hosts: ["host.docker.internal:host-gateway"]   # reach Ollama on the host (Linux; built in on Docker Desktop)
     volumes: [appdata:/data, ./config:/config:ro]
     ports: ["127.0.0.1:8100:8100"]
     depends_on:
@@ -55,6 +58,7 @@ services:
     build: ./backend
     command: ["celery", "-A", "app.tasks", "worker", "--loglevel=INFO", "--concurrency=2"]
     environment: *app-env
+    extra_hosts: ["host.docker.internal:host-gateway"]
     volumes: [appdata:/data, ./config:/config:ro]
     depends_on: [api, redis]
     restart: unless-stopped

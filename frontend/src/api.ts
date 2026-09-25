@@ -478,6 +478,33 @@ export interface ResumeLine extends Provenance {
 
 export interface CoverUnit extends Provenance {
   text: string;
+  generator?: string; // e.g. "ollama:qwen3.6:35b" when drafted by the local model and verified
+}
+
+export interface LetterGeneration {
+  generator: string; // "template" or "ollama:<model>"
+  kept?: number;
+  facts_sent?: number;
+  dropped?: { text: string; reasons: string[] }[];
+  fallback_reason?: string;
+}
+
+export interface LLMModel {
+  name: string;
+  size_gb: number;
+  parameters: string | null;
+  family: string | null;
+  local: boolean;
+}
+
+export interface LLMStatus {
+  enabled: boolean;
+  model: string;
+  base_url: string;
+  endpoint_is_local: boolean;
+  reachable: boolean;
+  models: LLMModel[];
+  error: string | null;
 }
 
 export interface PacketAnswer {
@@ -499,6 +526,7 @@ export interface Packet {
   cover_letter: CoverUnit[];
   answers: PacketAnswer[];
   unsupported_count: number;
+  generation?: { cover_letter?: LetterGeneration };
 }
 
 export interface HandoffRef {
@@ -574,6 +602,8 @@ export const api = {
   pause: (reason: string) => request<PauseState>("POST", "/controls/pause", { reason }),
   resume: (reason: string) => request<PauseState>("POST", "/controls/resume", { reason }),
   setRetention: (r: Partial<Retention>) => request<Retention>("PUT", "/controls/retention", r),
+  llm: () => request<LLMStatus>("GET", "/llm"),
+  setLlm: (enabled: boolean, model: string) => request<{ enabled: boolean; model: string }>("PUT", "/llm", { enabled, model }),
   audit: (limit = 200, beforeId?: number) => request<AuditEvent[]>("GET", `/audit${q({ limit, before_id: beforeId })}`),
   verifyAudit: () => request<AuditVerify>("GET", "/audit/verify"),
   exportData: () => downloadBlob("/privacy/export", "jobapplier_export.zip"),

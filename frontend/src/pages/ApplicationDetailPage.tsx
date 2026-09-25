@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import {
-  api, canTransition, type ApplicationDetail, type AutoSubmitPolicy, type MatchData, type Packet, type StandardAnswer,
+  api, canTransition, type ApplicationDetail, type AutoSubmitPolicy, type LetterGeneration, type MatchData, type Packet, type StandardAnswer,
   type SubmitResult,
 } from "../api";
 import { useApp } from "../components/context";
@@ -363,11 +363,16 @@ function PacketCard({ a, onChanged }: { a: ApplicationDetail; onChanged: () => v
         </ul>
       </details>
       <details>
-        <summary><strong>Cover letter</strong> ({pk.cover_letter.length} units)</summary>
+        <summary>
+          <strong>Cover letter</strong> ({pk.cover_letter.length} units){" "}
+          <LetterGeneratorBadge gen={pk.generation?.cover_letter} />
+        </summary>
+        <LetterGenerationNote gen={pk.generation?.cover_letter} />
         <ul className="packet-lines">
           {pk.cover_letter.map((u, i) => (
             <li key={i}>
               <span className="line-text">{u.text}</span>
+              {u.generator && <Badge tone="info" title={`Drafted by ${u.generator}, then verified against the cited facts`}>AI · verified</Badge>}
               <ProvenanceChips p={u} />
             </li>
           ))}
@@ -492,5 +497,42 @@ function HistoryCard({ a }: { a: ApplicationDetail }) {
         </ul>
       )}
     </Section>
+  );
+}
+
+
+function LetterGeneratorBadge({ gen }: { gen?: LetterGeneration }) {
+  if (!gen || gen.generator === "template") return <Badge tone="muted">template</Badge>;
+  return <Badge tone="info">{gen.generator.replace("ollama:", "local model: ")}</Badge>;
+}
+
+/** Shows why the letter fell back to the template, and every model sentence the claim verifier rejected. */
+function LetterGenerationNote({ gen }: { gen?: LetterGeneration }) {
+  if (!gen) return null;
+  const dropped = gen.dropped ?? [];
+  return (
+    <div className="tiny">
+      {gen.fallback_reason && (
+        <Notice tone="warn">Local model not used, template letter instead: {gen.fallback_reason}</Notice>
+      )}
+      {gen.generator !== "template" && (
+        <p className="muted">
+          The body was drafted by your local model from {gen.facts_sent ?? "?"} approved facts (no contact details and no job
+          description were sent). Each sentence below was kept only because every word and number traces to the facts it cites.
+        </p>
+      )}
+      {dropped.length > 0 && (
+        <details>
+          <summary>{dropped.length} model sentence(s) rejected by the claim verifier</summary>
+          <ul>
+            {dropped.map((d, i) => (
+              <li key={i}>
+                <span className="line-text">{d.text}</span> <span className="bad-text">({d.reasons.join("; ")})</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }

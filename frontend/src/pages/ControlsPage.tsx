@@ -13,6 +13,7 @@ export function ControlsPage() {
       <h1 className="page-title">Controls &amp; privacy</h1>
       {!canWrite && <ReadOnlyNote />}
       <PauseSection />
+      <LLMSection />
       <RetentionSection />
       {canWrite && <PrivacySection />}
       <AuditSection />
@@ -208,6 +209,68 @@ function AuditSection() {
         </div>
       )}
       {audit.data && <p className="tiny muted">Showing the latest {audit.data.length} event(s).</p>}
+    </Section>
+  );
+}
+
+
+/** Local LLM (Ollama) for cover-letter drafting. Only models installed on this machine are offered. */
+function LLMSection() {
+  const { canWrite } = useApp();
+  const st = useAsync(() => api.llm(), []);
+  const act = useAction();
+  const [model, setModel] = useState<string>("");
+  const s = st.data;
+  useEffect(() => {
+    if (s) setModel(s.model);
+  }, [s?.model]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function save(enabled: boolean) {
+    const r = await act.run(() => api.setLlm(enabled, model), enabled ? "Local model enabled for cover letters." : "Local model disabled; template letters only.");
+    if (r) st.reload();
+  }
+
+  return (
+    <Section title="Cover letters: local AI model">
+      {st.loading && <Loading />}
+      {st.error && <ErrorBox error={st.error} />}
+      {s && (
+        <>
+          <p className="tiny muted">
+            When enabled, the letter body is drafted by an Ollama model on this machine from your approved facts only. The model
+            never receives your contact details or the job description. Every sentence is checked, and any word or number not
+            backed by a cited fact is rejected. If too little survives, the template letter is used. Cloud-hosted models are refused.
+          </p>
+          <div className="row-wrap">
+            <Badge tone={s.enabled ? "ok" : "muted"}>{s.enabled ? "enabled" : "disabled"}</Badge>{" "}
+            <Badge tone={s.reachable ? "ok" : "bad"}>{s.reachable ? "Ollama reachable" : "Ollama not reachable"}</Badge>{" "}
+            <Badge tone={s.endpoint_is_local ? "ok" : "bad"}>{s.endpoint_is_local ? "local endpoint" : "non-local endpoint"}</Badge>{" "}
+            <span className="tiny muted">{s.base_url}</span>
+          </div>
+          {s.error && <Notice tone="warn">{s.error}</Notice>}
+          <fieldset disabled={!canWrite || !s.reachable} className="grid-form">
+            <Field label="Model" hint="Installed local models only">
+              <select value={model} onChange={(e) => setModel(e.target.value)}>
+                {!s.models.some((m) => m.name === model) && <option value={model}>{model} (not installed)</option>}
+                {s.models.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name} · {m.parameters ?? "?"} · {m.size_gb} GB
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </fieldset>
+          <ActionFeedback action={act} />
+          {canWrite && (
+            <div className="form-actions">
+              <button className="btn btn-primary" disabled={act.busy || !s.reachable} onClick={() => save(true)}>
+                {s.enabled ? "Save model" : "Enable"}
+              </button>{" "}
+              {s.enabled && <button className="btn" disabled={act.busy} onClick={() => save(false)}>Disable</button>}
+            </div>
+          )}
+        </>
+      )}
     </Section>
   );
 }

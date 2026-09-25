@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 20.0
     user_agent: str = "jobApplier/0.1 (self-hosted personal job search)"
 
+    # Local LLM (Ollama) for cover-letter drafting. Off unless enabled in the UI/API (system_controls 'llm').
+    llm_base_url: str = "http://127.0.0.1:11434"  # Docker: http://host.docker.internal:11434
+    llm_default_model: str = "qwen3.6:35b"
+    llm_timeout_seconds: float = 180.0
+    # Hosts other than loopback/private/host.docker.internal, and Ollama ":cloud" models, are refused unless True.
+    llm_allow_remote: bool = False
+
     # Freshness
     listing_old_after_days: int = 60  # matching note only; never expires a still-published listing
     listing_stale_hours: int = 48  # listing must have been seen within this window to be submittable

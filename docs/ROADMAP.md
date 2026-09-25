@@ -11,7 +11,7 @@ Every source or submission route below is added **only after** a permission revi
 6. **Follow-up reminders**: FOLLOW_UP due dates plus local notifications.
 
 ## Later
-7. **Optional local LLM** (Ollama) for tailoring prose, behind a *claim verifier*: every generated sentence must map to cited approved facts, or it is dropped. No tool access, no credentials. Job text goes in a quoted data block only. External endpoints must be opt-in with PII redaction.
+7. ~~Optional local LLM for cover letters~~: **done** (Ollama + claim verifier). Next: use it for resume bullet ordering/summary under the same verifier.
 8. **Visible Playwright assist** (not auto-submit): opens the employer's apply page in a normal visible browser for the user and pre-fills only SUPPORTED fields. It stops at any CAPTCHA/MFA/attestation. Only for sites whose terms allow it.
 9. **Cloud folders**: Google Drive / OneDrive / Dropbox via the official OAuth APIs, read-only scope, one selected folder.
 10. **Multi-user**: Keycloak (OIDC), per-tenant isolation, admin MFA enforced by the IdP.

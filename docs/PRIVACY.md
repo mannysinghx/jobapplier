@@ -37,4 +37,8 @@ Backups made before the deletion still contain the data. Rotate or destroy them 
 Retention runs daily via Celery beat (`app.tasks.retention`).
 
 ## Models / AI
-The MVP uses no language model. If one is added (roadmap), it must be local by default. External endpoints must be opt-in, receive redacted input (no email/phone), and never be used to train shared models.
+Cover-letter drafting can use a **local Ollama model** (off by default; Controls → "Cover letters: local AI model").
+- **Local only**: the endpoint must be loopback, a private address or `host.docker.internal`. Ollama cloud-offloaded models (`:cloud`, no local weights) are refused. Override only with `JA_LLM_ALLOW_REMOTE=true`, which you should not set.
+- **Minimal input**: the model gets only numbered approved facts (roles, achievements, matched skills, education, certifications, summary), the sanitized job title and employer, and the matched skill names. It never receives your name, email, phone, location, sensitive answers or the job description.
+- **No training**: nothing is sent for training. Ollama runs inference only.
+- **Verification**: every sentence must cite facts and use only words and numbers found in them. Anything else is dropped, and the dropped sentences are shown to you on the packet. You still approve every packet.

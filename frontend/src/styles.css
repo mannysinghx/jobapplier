@@ -74,6 +74,7 @@ h3 { font-size: 13px; font-weight: 650; margin: 12px 0 6px; color: var(--text-2)
 
 /* ---------- utilities */
 .muted { color: var(--muted); }
+.bad-text { color: var(--bad, #d64545); }
 .small { font-size: 12.5px; }
 .tiny { font-size: 11.5px; }
 .right { text-align: right; }
