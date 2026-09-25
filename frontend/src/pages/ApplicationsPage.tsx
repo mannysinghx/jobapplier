@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, APP_STATES, type AppState } from "../api";
 import { useAsync } from "../components/useAsync";
-import { Badge, Empty, ErrorBox, Loading, StateBadge } from "../components/ui";
+import { Badge, Empty, ErrorBox, Loading, SiteBadge, StateBadge } from "../components/ui";
 
 // Remembered while the app is open so returning from a detail page keeps the filters.
 let rememberedStates: AppState[] = [];
@@ -51,7 +51,7 @@ export function ApplicationsPage() {
       ) : (
         <div className="app-list">
           <div className="app-row app-head" aria-hidden="true">
-            <span>Score</span><span>Role</span><span>Location</span><span>Source</span><span>State</span><span>Top unmet</span>
+            <span>Score</span><span>Role</span><span>Location</span><span>Site</span><span>State</span><span>Top unmet</span>
           </div>
           {apps.data.map((a) => (
             <a key={a.id} className="app-row" href={`#jobs/${a.id}`}>
@@ -64,7 +64,10 @@ export function ApplicationsPage() {
                 {a.job.location || "—"}
                 {a.job.work_arrangement && a.job.work_arrangement !== "unknown" ? <span className="muted"> · {a.job.work_arrangement}</span> : null}
               </span>
-              <span className="app-src small muted">{a.job.source}</span>
+              <span className="app-src small">
+                <SiteBadge site={a.job.site} />
+                {a.job.meta?.summary_only ? <span className="summary-only" title="Only a summary is available; add or fetch the full description for a better score">summary only</span> : null}
+              </span>
               <span className="app-state"><StateBadge state={a.state} /></span>
               <span className="app-unmet tiny">
                 {a.exclusions.length > 0 && <span className="text-bad">excluded: {a.exclusions[0]}{a.exclusions.length > 1 ? ` (+${a.exclusions.length - 1})` : ""}</span>}

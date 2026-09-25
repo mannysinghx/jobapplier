@@ -9,6 +9,7 @@ import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { ControlsPage } from "./pages/ControlsPage";
 import { FactsPage } from "./pages/FactsPage";
 import { HandoffsPage } from "./pages/HandoffsPage";
+import { ImportPage } from "./pages/ImportPage";
 import { PreferencesPage } from "./pages/PreferencesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SourcesPage } from "./pages/SourcesPage";
@@ -19,6 +20,7 @@ const TABS = [
   { id: "answers", label: "Answers" },
   { id: "preferences", label: "Preferences" },
   { id: "sources", label: "Sources" },
+  { id: "import", label: "Import" },
   { id: "jobs", label: "Jobs" },
   { id: "handoffs", label: "Handoffs" },
   { id: "controls", label: "Controls & Privacy" },
@@ -162,6 +164,7 @@ export default function App() {
         {route.tab === "answers" && <AnswersPage />}
         {route.tab === "preferences" && <PreferencesPage />}
         {route.tab === "sources" && <SourcesPage />}
+        {route.tab === "import" && <ImportPage />}
         {route.tab === "jobs" &&
           (route.sub && /^\d+$/.test(route.sub) ? <ApplicationDetailPage id={Number(route.sub)} /> : <ApplicationsPage />)}
         {route.tab === "handoffs" && <HandoffsPage />}

@@ -308,7 +308,7 @@ details > summary { cursor: pointer; color: var(--text-2); }
 /* ---------- applications list */
 .app-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .app-row {
-  display: grid; grid-template-columns: 56px minmax(180px, 2.2fr) minmax(110px, 1.2fr) 90px 130px minmax(140px, 1.6fr);
+  display: grid; grid-template-columns: 56px minmax(180px, 2.2fr) minmax(110px, 1.2fr) 112px 130px minmax(140px, 1.6fr);
   gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); align-items: start;
 }
 .app-row:last-child { border-bottom: 0; }
@@ -394,4 +394,31 @@ a.app-row:hover { background: var(--surface-2); text-decoration: none; }
   .user-name { max-width: 28vw; }
   .sec-tag { display: none; }
   .btn-big { width: 100%; }
+}
+
+/* ---------- job sites & imports */
+.site-badge { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+.site-linkedin { background: #e8f1fb; color: #0a5aa8; border-color: transparent; }
+.site-indeed { background: #eaeefc; color: #2451b3; border-color: transparent; }
+.site-ziprecruiter { background: #e6f5ee; color: #11734b; border-color: transparent; }
+.site-dice { background: #fbe9ec; color: #b01a38; border-color: transparent; }
+.site-ladders { background: #f1ecfa; color: #5d3aa0; border-color: transparent; }
+.site-greenhouse, .site-lever, .site-ashby { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+@media (prefers-color-scheme: dark) {
+  .site-linkedin { background: #10263d; color: #7cb8f2; }
+  .site-indeed { background: #172242; color: #8ea8f0; }
+  .site-ziprecruiter { background: #0f2c21; color: #6fd3a5; }
+  .site-dice { background: #3a1219; color: #f08aa0; }
+  .site-ladders { background: #251a3a; color: #b9a0ec; }
+}
+.app-src { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.summary-only {
+  font-size: 10.5px; color: var(--warn); border: 1px dashed color-mix(in srgb, var(--warn) 60%, transparent);
+  border-radius: 4px; padding: 0 5px; white-space: nowrap;
+}
+.apply-self { padding: 6px 10px; border-left: 3px solid var(--info); background: var(--info-soft); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.summary-panel { margin: 8px 0; }
+.summary-panel .alert { margin-top: 0; }
+@media (max-width: 760px) {
+  .app-src { flex-direction: row; flex-wrap: wrap; align-items: center; }
 }

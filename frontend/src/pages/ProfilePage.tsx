@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { api, type Profile, type ProfileIn } from "../api";
+import { api, type LinkedInImportResult, type Profile, type ProfileIn } from "../api";
 import { useApp } from "../components/context";
 import { useAction, useAsync } from "../components/useAsync";
 import {
@@ -231,6 +231,7 @@ function UploadsAndDocuments() {
   const docs = useAsync(() => api.documents(), []);
   const resumeAction = useAction();
   const liAction = useAction();
+  const [liResult, setLiResult] = useState<LinkedInImportResult | null>(null);
   const resumeRef = useRef<HTMLInputElement>(null);
   const liRef = useRef<HTMLInputElement>(null);
   const reload = docs.reload;
@@ -256,11 +257,13 @@ function UploadsAndDocuments() {
     e.preventDefault();
     const f = liRef.current?.files?.[0];
     if (!f) return;
+    setLiResult(null);
     const r = await liAction.run(() => api.uploadLinkedIn(f),
       (x) => x.duplicate
-        ? "This export was already imported (identical file). Nothing changed."
-        : `Imported: ${x.facts_created} candidate facts, ${x.conflicts} conflicts with existing facts. Review them in the Facts tab.`);
+        ? "Profile facts: this export was already imported (identical file), so no new facts."
+        : `Profile facts: ${x.facts_created} candidate facts, ${x.conflicts} conflicts with existing facts. Review them in the Facts tab.`);
     if (r) {
+      setLiResult(r);
       if (liRef.current) liRef.current.value = "";
       docs.reload();
     }
@@ -284,11 +287,21 @@ function UploadsAndDocuments() {
                 This is <strong>your own</strong> LinkedIn data export: on LinkedIn go to Settings &amp; Privacy → Data privacy →
                 “Get a copy of your data”, download the ZIP LinkedIn emails you, and upload it here (up to 50 MB).
                 jobApplier never asks for your LinkedIn password and never logs in to or scrapes LinkedIn.
-                Differences from your resume show up as conflicts for you to resolve.
+                Differences from your resume show up as conflicts for you to resolve. The same export also imports your
+                <strong> Saved Jobs</strong> and <strong>Job Applications</strong>: past applications are recorded as already
+                submitted so you are warned before applying to the same role twice.
               </p>
               <input ref={liRef} type="file" accept=".zip,application/zip" required />
               <div><button className="btn btn-primary" type="submit" disabled={liAction.busy}>{liAction.busy ? "Importing…" : "Import export ZIP"}</button></div>
               <ActionFeedback action={liAction} />
+              {liResult?.jobs && ("error" in liResult.jobs ? (
+                <Notice tone="warn">Profile facts were imported, but the Saved Jobs / Job Applications part failed: {liResult.jobs.error}</Notice>
+              ) : (
+                <div className="alert alert-ok small">
+                  Jobs: {liResult.jobs.saved_jobs} saved job(s) and {liResult.jobs.past_applications} past application(s) imported.{" "}
+                  <a href="#jobs">View jobs →</a>
+                </div>
+              ))}
             </form>
           </Section>
         </div>

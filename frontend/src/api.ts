@@ -249,6 +249,8 @@ export interface LinkedInImportResult {
   facts_created: number;
   conflicts: number;
   duplicate: boolean;
+  /** Saved Jobs + Job Applications from the same export, or {error} if only that part failed. */
+  jobs?: { saved_jobs: number; past_applications: number } | { error: string };
 }
 
 export const FACT_KINDS = ["role", "achievement", "education", "skill", "certification", "project", "summary", "contact"] as const;
@@ -369,11 +371,33 @@ export interface SourcePatch {
   daily_submit_limit?: number;
 }
 
+/** Dice saved-search parameters (backend/app/connectors/dice.py validate_params allowlist). */
+export const DICE_WORKPLACE_TYPES = ["Remote", "On-Site", "Hybrid"] as const;
+export const DICE_EMPLOYMENT_TYPES = ["FULLTIME", "CONTRACTS", "PARTTIME", "THIRD_PARTY", "INTERNSHIP"] as const;
+export const DICE_POSTED_DATES = ["ONE", "THREE", "SEVEN"] as const;
+export type DicePosted = (typeof DICE_POSTED_DATES)[number];
+
+export interface DiceParams {
+  keyword: string;
+  location?: string;
+  workplace_types?: string[];
+  employment_types?: string[];
+  posted_date?: DicePosted;
+}
+
+export interface BoardIn {
+  source_key: string;
+  board_token?: string | null; // auto-generated for search-based sources (Dice)
+  employer_name?: string | null;
+  params?: DiceParams | null; // required for Dice, rejected for employer boards
+}
+
 export interface Board {
   id: number;
   source_key: string;
   board_token: string;
   employer_name: string | null;
+  params: Partial<DiceParams> & Record<string, unknown>; // {} for employer boards
   enabled: boolean;
   consecutive_failures: number;
   next_attempt_at: ISODate | null;
@@ -429,6 +453,26 @@ export interface Job {
   canonical_url: string | null;
   apply_url: string | null;
   permission: Record<string, unknown>;
+  expires_at?: ISODate | null;
+  meta: JobMeta;
+  /** linkedin | indeed | ziprecruiter | dice | ladders | greenhouse | lever | ashby | other, or the source key. */
+  site: string;
+}
+
+/** Source-specific extras on a job. Every field is optional. */
+export interface JobMeta {
+  site?: string;
+  via?: "email_alert" | "manual" | "linkedin_export" | string;
+  summary_only?: boolean;
+  dice_guid?: string;
+  details_fetched?: string;
+  description_by_user?: boolean;
+  dkim?: "pass" | "fail" | "unknown" | string;
+  email_date?: string;
+  salary_text?: string;
+  easy_apply?: boolean;
+  employer_guessed?: boolean;
+  [extra: string]: unknown;
 }
 
 export interface ApplicationSummary {
@@ -553,6 +597,14 @@ export interface AutoSubmitPolicy {
   checks: Record<string, boolean>;
 }
 
+export interface PriorApplication {
+  application_id: number;
+  state: AppState;
+  source: string;
+  note: string | null;
+  updated_at: ISODate;
+}
+
 export interface ApplicationDetail extends ApplicationSummary {
   match: MatchData | null;
   description: string;
@@ -561,6 +613,39 @@ export interface ApplicationDetail extends ApplicationSummary {
   handoffs: HandoffRef[];
   attempts: Attempt[];
   auto_submit_policy: AutoSubmitPolicy;
+  /** Already SUBMITTED/CONFIRMED/FOLLOW_UP applications for the same employer + title on any source. */
+  prior_applications: PriorApplication[];
+  /** Registry attribution text. Dice requires showing it with its results. */
+  source_attribution: string | null;
+  notes: string | null;
+}
+
+// ------------------------------------------------------------------ user imports (no scraping)
+export interface AlertImportResult {
+  messages: number;
+  alert_messages: number;
+  skipped_non_alert_messages: number;
+  jobs_found: number;
+  jobs_new: number;
+  by_site: Record<string, number>;
+  rejected_links: number;
+  expired_stale: number;
+  matched: MatchCounts;
+}
+
+export interface ManualJobIn {
+  url: string;
+  title: string;
+  employer: string;
+  location?: string | null;
+  salary?: string | null;
+  description?: string | null;
+}
+
+export interface ManualJobResult {
+  job: Job;
+  application_id: number | null;
+  suggested_board: { source_key: string; board_token: string } | null;
 }
 
 export interface SubmitResult {
@@ -654,8 +739,7 @@ export const api = {
   sources: () => request<Source[]>("GET", "/sources"),
   patchSource: (key: string, patch: SourcePatch) => request<Source>("PATCH", `/sources/${enc(key)}`, patch),
   boards: () => request<Board[]>("GET", "/boards"),
-  addBoard: (source_key: string, board_token: string, employer_name: string | null) =>
-    request<Board>("POST", "/boards", { source_key, board_token, employer_name }),
+  addBoard: (body: BoardIn) => request<Board>("POST", "/boards", body),
   setBoardEnabled: (id: number, enabled: boolean) => request<Board>("PATCH", `/boards/${id}`, { enabled }),
   deleteBoard: (id: number) => request<void>("DELETE", `/boards/${id}`),
   connectorHealth: () => request<ConnectorHealth[]>("GET", "/health/connectors"),
@@ -680,6 +764,18 @@ export const api = {
   followUp: (id: number, reason = "") => request<{ state: AppState }>("POST", `/applications/${id}/follow-up`, { reason }),
   resumeDocxUrl: (id: number) => `/api/applications/${id}/resume.docx`,
   coverLetterUrl: (id: number) => `/api/applications/${id}/cover-letter.txt`,
+
+  // user imports
+  importAlertEmails: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<AlertImportResult>("POST", "/imports/alert-emails", fd);
+  },
+  addManualJob: (body: ManualJobIn) => request<ManualJobResult>("POST", "/jobs/manual", body),
+  /** Only for jobs whose source is email_alert or user_import (409 otherwise). */
+  setJobDescription: (jobId: number, description: string) => request<Job>("PUT", `/jobs/${jobId}/description`, { description }),
+  /** User-initiated, one Dice job at a time. Never call this in a loop. */
+  fetchJobDetails: (jobId: number) => request<Job>("POST", `/jobs/${jobId}/fetch-details`, {}),
 
   // handoffs
   handoffs: (status = "OPEN") => request<HandoffItem[]>("GET", `/handoffs${q({ status })}`),

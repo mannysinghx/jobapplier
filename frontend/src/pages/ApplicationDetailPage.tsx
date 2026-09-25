@@ -6,8 +6,8 @@ import {
 import { useApp } from "../components/context";
 import { useAction, useAsync, type ActionState } from "../components/useAsync";
 import {
-  ActionFeedback, AnswerStatusBadge, Badge, Check, Empty, ErrorBox, Field, Loading, Notice, ProvenanceChips, SafeLink,
-  Section, StateBadge, UntrustedText, fmtDate,
+  ActionFeedback, AnswerStatusBadge, Badge, Check, DkimBadge, Empty, ErrorBox, Field, Loading, MANUAL_APPLY_SITES, Notice,
+  ProvenanceChips, SafeLink, Section, SiteBadge, StateBadge, UntrustedText, ViaBadge, fmtDate, siteLabel,
 } from "../components/ui";
 import { scoreTone } from "./ApplicationsPage";
 
@@ -51,6 +51,7 @@ export function ApplicationDetailPage({ id }: { id: number }) {
       <ErrorBox error={res.error} />
       {res.loading && !a ? <Loading /> : !a ? null : (
         <>
+          <SourceNotices a={a} />
           <JobHeader a={a} onRefresh={res.reload} loading={res.loading} />
           {canWrite && <ActionsCard a={a} onChanged={res.reload} />}
           <PolicyCard policy={a.auto_submit_policy} />
@@ -59,6 +60,7 @@ export function ApplicationDetailPage({ id }: { id: number }) {
           <HistoryCard a={a} />
           <Section title="Job description">
             <p className="tiny muted">Untrusted text from the job source. Shown as plain text only; nothing in it can change what this app does.</p>
+            <SummaryOnlyPanel a={a} onChanged={res.reload} />
             <UntrustedText text={a.description} />
             {a.requirements && a.requirements.length > 0 && (
               <>
@@ -75,8 +77,76 @@ export function ApplicationDetailPage({ id }: { id: number }) {
   );
 }
 
+/** Dice's required AI-search disclosure, and the already-applied warning. Shown above everything else. */
+function SourceNotices({ a }: { a: ApplicationDetail }) {
+  const prior = a.prior_applications ?? [];
+  return (
+    <>
+      {a.job.source === "dice" && a.source_attribution && (
+        <Notice tone="info"><strong>Dice:</strong> {a.source_attribution}</Notice>
+      )}
+      {prior.length > 0 && (
+        <Notice tone="warn">
+          <strong>You may already have applied to this role:</strong>
+          <ul className="plain-list">
+            {prior.map((p) => (
+              <li key={p.application_id}>
+                <a href={`#jobs/${p.application_id}`}>application #{p.application_id}</a> — {p.state.replace(/_/g, " ").toLowerCase()} via{" "}
+                {siteLabel(p.source)}, {fmtDate(p.updated_at)}{p.note ? ` (${p.note})` : ""}
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
+    </>
+  );
+}
+
+/** Summary-only listings: Dice jobs can fetch one job's details on request; imported jobs take a pasted description. */
+function SummaryOnlyPanel({ a, onChanged }: { a: ApplicationDetail; onChanged: () => void }) {
+  const { canWrite } = useApp();
+  const act = useAction();
+  const [text, setText] = useState("");
+  const j = a.job;
+  if (!j.meta?.summary_only) return null;
+  const isDice = j.source === "dice" && Boolean(j.meta.dice_guid);
+  const pasteable = j.source === "email_alert" || j.source === "user_import";
+
+  return (
+    <div className="summary-panel">
+      <Notice tone="warn">
+        Only a summary of this listing is available, so skills and requirements may be missing from the match score.
+      </Notice>
+      {canWrite && isDice && (
+        <div className="stack">
+          <div>
+            <button className="btn btn-primary" disabled={act.busy}
+              onClick={async () => { if (await act.run(() => api.fetchJobDetails(j.id), "Full description fetched from Dice. Re-scored.")) onChanged(); }}>
+              {act.busy ? "Fetching…" : "Fetch full description from Dice"}
+            </button>
+          </div>
+          <p className="tiny muted">Fetches this one job through Dice’s official server, only when you click. Descriptions are never fetched in bulk.</p>
+        </div>
+      )}
+      {canWrite && pasteable && (
+        <form className="stack" onSubmit={async (e: FormEvent) => {
+          e.preventDefault();
+          if (await act.run(() => api.setJobDescription(j.id, text), "Description saved. Re-scored.")) { setText(""); onChanged(); }
+        }}>
+          <Field label="Paste full description" wide hint="Copy it from the job page in your browser (at least 20 characters). It is stored as plain text.">
+            <textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} maxLength={60000} minLength={20} required />
+          </Field>
+          <div><button className="btn btn-primary" type="submit" disabled={act.busy || text.trim().length < 20}>Save description</button></div>
+        </form>
+      )}
+      <ActionFeedback action={act} />
+    </div>
+  );
+}
+
 function JobHeader({ a, onRefresh, loading }: { a: ApplicationDetail; onRefresh: () => void; loading: boolean }) {
   const j = a.job;
+  const meta = j.meta ?? {};
   const salary = j.salary_min !== null || j.salary_max !== null
     ? [money(j.salary_min, j.salary_currency), money(j.salary_max, j.salary_currency)].filter(Boolean).join(" – ")
     : null;
@@ -88,6 +158,7 @@ function JobHeader({ a, onRefresh, loading }: { a: ApplicationDetail; onRefresh:
           <div className="job-emp">{j.employer}</div>
         </div>
         <div className="badges">
+          <SiteBadge site={j.site} />
           <Badge tone={scoreTone(a.score)}>score {a.score === null ? "—" : a.score.toFixed(1)}</Badge>
           <StateBadge state={a.state} />
           <button className="btn btn-small" onClick={onRefresh} disabled={loading}>Refresh</button>
@@ -104,10 +175,30 @@ function JobHeader({ a, onRefresh, loading }: { a: ApplicationDetail; onRefresh:
         {j.expired_at && <Badge tone="bad">expired {fmtDate(j.expired_at)}</Badge>}
         {j.duplicate_of_id && <Badge tone="warn">duplicate of job #{j.duplicate_of_id}</Badge>}
       </div>
+      <div className="badges">
+        <ViaBadge via={meta.via} />
+        {(meta.via === "email_alert" || meta.dkim !== undefined) && <DkimBadge dkim={meta.dkim} />}
+        {meta.summary_only && <Badge tone="warn">summary only</Badge>}
+        {meta.description_by_user && <Badge tone="muted">description pasted by you</Badge>}
+        {meta.details_fetched && <Badge tone="muted">details fetched {fmtDate(String(meta.details_fetched))}</Badge>}
+        {meta.employer_guessed && <Badge tone="warn" title="The alert email did not state the employer clearly">employer name guessed</Badge>}
+        {meta.easy_apply && <Badge tone="muted">Easy Apply on {siteLabel(j.site)}</Badge>}
+        {meta.email_date && <span className="tiny muted">alert email {String(meta.email_date)}</span>}
+        {meta.salary_text && !salary && <span className="tiny">salary: {String(meta.salary_text)}</span>}
+      </div>
       <div className="job-links small">
         <span>Apply: <SafeLink href={j.apply_url}>open application page ↗</SafeLink></span>
         {j.canonical_url && j.canonical_url !== j.apply_url && <span>Listing: <SafeLink href={j.canonical_url}>view listing ↗</SafeLink></span>}
       </div>
+      {MANUAL_APPLY_SITES.has(j.site) && (
+        <div className="apply-self small">
+          Apply on {siteLabel(j.site)} yourself. {siteLabel(j.site)}’s terms do not allow automated applications. Use the packet below.
+        </div>
+      )}
+      {a.notes && (
+        <div className="small"><span className="muted">Notes: </span><span className="pre-wrap">{a.notes}</span></div>
+      )}
+      {a.source_attribution && j.source !== "dice" && <div className="tiny muted">{a.source_attribution}</div>}
     </section>
   );
 }

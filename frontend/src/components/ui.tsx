@@ -231,3 +231,68 @@ export function Empty({ children }: { children: ReactNode }) {
 export function ReadOnlyNote() {
   return <Notice tone="info">You are signed in as a viewer. Changes are disabled.</Notice>;
 }
+
+// ------------------------------------------------------------------ job sites
+export const SITE_LABELS: Record<string, string> = {
+  linkedin: "LinkedIn",
+  indeed: "Indeed",
+  ziprecruiter: "ZipRecruiter",
+  dice: "Dice",
+  ladders: "Ladders",
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  ashby: "Ashby",
+  other: "Other site",
+  email_alert: "Alert email",
+  user_import: "Your import",
+};
+
+/** Sites whose terms forbid automated applications: the user applies there themselves. */
+export const MANUAL_APPLY_SITES = new Set(["linkedin", "indeed", "ziprecruiter", "dice", "ladders"]);
+
+export function siteLabel(site: string | null | undefined): string {
+  if (!site) return "Unknown";
+  return SITE_LABELS[site] ?? site;
+}
+
+export function SiteBadge({ site }: { site: string | null | undefined }) {
+  const s = site ?? "";
+  return <span className={`badge site-badge site-${/^[a-z_]+$/.test(s) ? s : "other"}`}>{siteLabel(s)}</span>;
+}
+
+const VIA_LABELS: Record<string, string> = {
+  email_alert: "from alert email",
+  manual: "added manually",
+  linkedin_export: "LinkedIn export",
+};
+
+export function ViaBadge({ via }: { via: unknown }) {
+  if (typeof via !== "string" || !via) return null;
+  return <Badge tone="muted">{VIA_LABELS[via] ?? via.replace(/_/g, " ")}</Badge>;
+}
+
+/** DKIM verdict recorded by the user's mail provider for an alert email. */
+export function DkimBadge({ dkim }: { dkim: unknown }) {
+  if (dkim === "pass") {
+    return <Badge tone="ok" title="DKIM pass for the site's domain, recorded by your mail provider">✓ sender verified by your mail provider</Badge>;
+  }
+  return (
+    <Badge tone="warn" title={`DKIM: ${typeof dkim === "string" ? dkim : "unknown"}`}>
+      sender not verified: check the link before using it
+    </Badge>
+  );
+}
+
+const POSTED_LABELS: Record<string, string> = { ONE: "last 1 day", THREE: "last 3 days", SEVEN: "last 7 days" };
+
+/** One-line summary of a Dice saved search. */
+export function fmtSearchParams(p: Record<string, unknown> | null | undefined): string {
+  if (!p || !Object.keys(p).length) return "";
+  const parts: string[] = [];
+  if (p.keyword) parts.push(`“${String(p.keyword)}”`);
+  parts.push(p.location ? `in ${String(p.location)}` : "any location");
+  if (Array.isArray(p.workplace_types) && p.workplace_types.length) parts.push(p.workplace_types.join("/"));
+  if (Array.isArray(p.employment_types) && p.employment_types.length) parts.push(p.employment_types.join("/").toLowerCase().replace(/_/g, " "));
+  if (typeof p.posted_date === "string") parts.push(POSTED_LABELS[p.posted_date] ?? p.posted_date);
+  return parts.join(" · ");
+}
