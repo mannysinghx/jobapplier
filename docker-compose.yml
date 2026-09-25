@@ -1,0 +1,88 @@
+# jobApplier MVP stack. All published ports bind to 127.0.0.1 only. Put a TLS reverse proxy in front for remote access.
+# Host ports avoid common defaults (5432/6379/8000) so they don't collide with services already running on the host.
+#
+#   cp .env.example .env   # then fill in secrets (see docs/SETUP.md)
+#   docker compose up -d --build
+#   docker compose --profile monitoring up -d     # optional Prometheus
+#   docker compose --profile av up -d             # optional ClamAV upload scanning (set JA_CLAMAV_HOST=clamav)
+
+name: jobapplier
+
+x-app-env: &app-env
+  JA_ENV: prod
+  JA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-jobapplier}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-jobapplier}
+  JA_REDIS_URL: redis://redis:6379/0
+  JA_ENCRYPTION_KEY: ${JA_ENCRYPTION_KEY:?set JA_ENCRYPTION_KEY in .env}
+  JA_DATA_DIR: /data
+  JA_SOURCES_FILE: /config/sources.yaml
+  JA_KILL_SWITCH_FILE: /data/KILL_SWITCH
+  JA_COOKIE_SECURE: ${JA_COOKIE_SECURE:-false}
+  JA_MFA_REQUIRED: "true"
+  JA_CLAMAV_HOST: ${JA_CLAMAV_HOST:-}
+  JA_CORS_ORIGINS: '["http://localhost:5180"]'
+
+services:
+  db:
+    image: postgres:16-alpine            # PostgreSQL License
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jobapplier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-jobapplier}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ["127.0.0.1:5442:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: valkey/valkey:8-alpine        # BSD-3-Clause Redis-protocol fork (Redis 7.4+ is not OSI open source)
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:6389:6379"]
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    environment: *app-env
+    volumes: [appdata:/data, ./config:/config:ro]
+    ports: ["127.0.0.1:8100:8100"]
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: ["celery", "-A", "app.tasks", "worker", "--loglevel=INFO", "--concurrency=2"]
+    environment: *app-env
+    volumes: [appdata:/data, ./config:/config:ro]
+    depends_on: [api, redis]
+    restart: unless-stopped
+
+  beat:
+    build: ./backend
+    command: ["celery", "-A", "app.tasks", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment: *app-env
+    depends_on: [api, redis]
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    ports: ["127.0.0.1:5180:80"]
+    depends_on: [api]
+    restart: unless-stopped
+
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v2.53.0        # Apache-2.0
+    volumes: [./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["127.0.0.1:9095:9090"]
+
+  clamav:
+    profiles: [av]
+    image: clamav/clamav:1.3              # GPL-2.0, runs as a separate service (network protocol only; no linking)
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:

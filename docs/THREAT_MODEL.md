@@ -1,0 +1,28 @@
+# Threat model
+
+Scope: single-user, self-hosted deployment (Docker Compose on a private machine, ports bound to 127.0.0.1).
+Assets: candidate PII (name, email, phone, resume, sensitive answers), session credentials, the encryption key, the candidate's reputation (no false claims, no spam applications), and the audit trail.
+
+| # | Threat | Vector | Mitigations (in code) | Tests |
+|---|---|---|---|---|
+| T1 | **Prompt injection in listings** | Job title/description/employer text with instructions | No LLM in the MVP. Job text is only tokenized for matching and shown as plain text. The policy engine (`policy.py`) reads DB/config/kill-switch only. Title/employer are sanitized, length-capped and replaced if instruction-like (`prep/packet.py:looks_injected`). Frontend never renders HTML from listings. | `test_prompt_injection.py` |
+| T2 | **Malicious API payloads** | Script tags, bidi overrides, `javascript:` URLs, huge responses | `sanitize_text` strips markup, controls and bidi characters. Non-https URLs are dropped. 25 MB response cap. Redirects are not followed. Board tokens are allowlisted by regex. | `test_hostile_api_payload_is_data_only`, `test_invalid_board_token_rejected` |
+| T3 | **Parser exploits** | Crafted PDF/DOCX, zip bombs, path tricks | Extension + magic-byte + size checks. Optional ClamAV scan. Parsing runs in a separate `python -I` process with an **empty environment** (no key or DB URL), CPU rlimit, memory rlimit (Linux) and a wall-clock timeout. DOCX/ZIP entry-count and expansion limits. Encrypted PDFs are refused. | `test_validation_rejects_bad_files`, `test_parser_subprocess_gets_no_secrets`, `test_malformed_pdf_fails_safely` |
+| T4 | **Folder over-reach** | Symlinks and `..` escaping the consented folder | Explicit consent record. Top-level PDF/DOCX only. Resolved paths must have the consented folder as parent. Read-only file opens. | `test_folder_is_read_only_and_confined` |
+| T5 | **False claims** | Generated material inventing experience | Materials are assembled only from APPROVED facts (verbatim values) + profile fields + fixed templates. `verify_provenance` runs at generation and approval. Unapproved facts never appear. Resume/LinkedIn conflicts block approval. | `test_resume_and_letter_cite_only_approved_facts`, `test_linkedin_export_conflicts_block_approval` |
+| T6 | **Sensitive answers inferred** | Work authorization, sponsorship, criminal history, EEO | Classifier routes these to `SENSITIVE_MISSING` unless an explicit, approved, encrypted standard answer exists. Attestations always need the human. | `test_sensitive_questions_are_never_inferred` |
+| T7 | **Duplicate / runaway submissions** | Retries, re-posted roles, bugs | Unique idempotency key per application. Retry only from FAILED/CHALLENGE. UNKNOWN outcomes are never auto-retried. Cross-listing dedupe key. Daily global and per-source limits. | `test_policy.py` (idempotency, limits, unknown outcome, re-post) |
+| T8 | **Unpermitted automation** | Enabling a source/submit route without permission | Registry gate: `read_permitted`/`submit_permitted` plus a review date (<90 days). API refuses to enable. Auto-submit also needs a *verified* adapter; none exist. | `test_default_configuration_never_auto_submits`, `test_disabled_or_unreviewed_source_is_not_polled` |
+| T9 | **Anti-bot / CAPTCHA / MFA on sites** | Challenge during submission | Adapter contract: return CHALLENGE and never solve it. The app goes to NEEDS_REVIEW and a handoff task is created. | `test_challenge_creates_handoff_and_never_solves` |
+| T10 | **Credential leakage** | Logs, audit, API responses | Argon2id passwords, TOTP secrets encrypted, session tokens stored as SHA-256. Audit `details` scrubbed of sensitive keys. Sensitive answers masked in API responses. No LinkedIn credentials are ever requested. | `test_audit_is_append_only` (redaction) |
+| T11 | **Session hijack / CSRF** | Cross-site requests, stolen cookies | httpOnly + SameSite=Strict cookies (Secure behind TLS), CSRF double-submit on every non-GET, login lockout (5 failures / 5 min), MFA for admins, restrictive CSP and security headers. | `test_auth_required_and_csrf_enforced`, `test_login_lockout` |
+| T12 | **Data exfiltration at rest** | Stolen disk/backup | Files encrypted (Fernet) in a content-addressed store. PII columns encrypted. The key lives only in env/secret store. Backups stay ciphertext unless the key is also stolen. | `test_stored_files_are_encrypted` |
+| T13 | **Audit tampering** | Editing history | DB triggers block UPDATE/DELETE (retention purge only through an explicit maintenance window, itself audited). SHA-256 hash chain detects edits even if triggers are dropped. | `test_audit_is_append_only`, `test_audit_tamper_detected` |
+| T14 | **Changing source terms** | Provider changes permissions | `date_checked` expiry forces a re-review every 90 days. Flipping permission in the registry force-disables user toggles and is audited. | `test_disabled_or_unreviewed_source_is_not_polled` |
+| T15 | **Compromised browser session (future Playwright)** | Automation acting beyond scope | Not implemented. Any future adapter must use a dedicated profile, visible mode, the `should_abort` checks and challenge handoff. | n/a |
+
+## Residual risks / known gaps
+- Memory rlimit is not enforceable on macOS (works in the Linux container). The wall-clock timeout still applies.
+- Single-user model: RBAC has admin/viewer only. Multi-tenant isolation (Keycloak) is on the roadmap.
+- Encryption key rotation is manual (see RUNBOOK).
+- `/metrics` is unauthenticated (aggregate counts only). Keep it on the private network.
