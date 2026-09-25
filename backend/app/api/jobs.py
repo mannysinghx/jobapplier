@@ -293,6 +293,18 @@ def restore(app_id: int, body: StateIn, db: Session = Depends(get_db), user: Use
     return _simple_transition(app_id, "DISCOVERED", body, db, user)
 
 
+@router.post("/applications/{app_id}/retry")
+def retry(app_id: int, body: StateIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """FAILED -> APPROVED. Safe: the idempotency key still blocks any attempt whose outcome is UNKNOWN or SUBMITTED."""
+    return _simple_transition(app_id, "APPROVED", body, db, user)
+
+
+@router.post("/applications/{app_id}/reopen")
+def reopen(app_id: int, body: StateIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """FAILED/APPROVED -> NEEDS_REVIEW, so the packet can be re-prepared."""
+    return _simple_transition(app_id, "NEEDS_REVIEW", body, db, user)
+
+
 @router.post("/applications/{app_id}/confirm")
 def confirm(app_id: int, body: StateIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     return _simple_transition(app_id, "CONFIRMED", body, db, user)

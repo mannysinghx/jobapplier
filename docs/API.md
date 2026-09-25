@@ -1,8 +1,8 @@
 # REST API
 
-Base path `/api`. Interactive docs: `/api/docs` (Swagger UI); machine-readable spec: [`openapi.json`](openapi.json).
+Base path `/api`. Interactive docs: `/api/docs` (Swagger UI). Machine-readable spec: [`openapi.json`](openapi.json).
 
-**Auth**: `POST /api/auth/login` sets an httpOnly session cookie + a `ja_csrf` cookie. Every non-GET request must send `x-csrf-token: <ja_csrf>`. Endpoints that write require role `admin`.
+**Auth**: `POST /api/auth/login` sets an httpOnly session cookie and a `ja_csrf` cookie. Every non-GET request must send `x-csrf-token: <ja_csrf>`. Endpoints that write require role `admin`.
 
 | Method | Path | Summary |
 |---|---|---|
@@ -56,6 +56,8 @@ Base path `/api`. Interactive docs: `/api/docs` (Swagger UI); machine-readable s
 | POST | `/api/applications/{app_id}/manual-submission` | Manual Submission |
 | POST | `/api/applications/{app_id}/reject` | Reject |
 | POST | `/api/applications/{app_id}/restore` | Restore |
+| POST | `/api/applications/{app_id}/retry` | Retry |
+| POST | `/api/applications/{app_id}/reopen` | Reopen |
 | POST | `/api/applications/{app_id}/confirm` | Confirm |
 | POST | `/api/applications/{app_id}/follow-up` | Follow Up |
 | GET | `/api/applications/{app_id}/resume.docx` | Resume Docx |

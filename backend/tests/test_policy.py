@@ -193,3 +193,15 @@ def test_manual_submission_records_packet(db, profile):
     assert app.state == "CONFIRMED" and att.adapter == "manual" and att.status == "CONFIRMED"
     with pytest.raises(ValueError):
         pipeline.record_manual_submission(db, app, "user:x", None, None)
+
+
+def test_retry_endpoint_cannot_bypass_unknown_outcome(db, authed, ready):  # authed first: app startup re-syncs the registry
+    app, adapter = ready
+    adapter.raise_exc = TimeoutError("after send")
+    pipeline.try_submit(db, app)
+    assert app.state == "FAILED"
+    assert authed.post(f"/api/applications/{app.id}/retry", json={"reason": "try again"}).json()["state"] == "APPROVED"
+    adapter.raise_exc = None
+    r = authed.post(f"/api/applications/{app.id}/submit").json()
+    assert r["submitted"] is False and adapter.calls == 1
+    assert authed.post(f"/api/applications/{app.id}/reopen", json={}).json()["state"] == "NEEDS_REVIEW"

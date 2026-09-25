@@ -88,7 +88,9 @@ def build_resume_lines(profile: Profile, facts: list[Fact], matched_skills: list
     if edu:
         add("Education", "heading", template=True)
         for e in edu:
-            bits = [e.data.get("degree"), e.data.get("institution"), e.data.get("year")]
+            year = e.data.get("year")
+            text_so_far = f"{e.data.get('degree') or ''} {e.data.get('institution') or ''}"
+            bits = [e.data.get("degree"), e.data.get("institution"), year if year and str(year) not in text_so_far else None]
             add(" — ".join(str(b) for b in bits if b), "education", fact_ids=[e.id])
     certs = [f for f in approved if f.kind == "certification"]
     if certs:
