@@ -666,6 +666,84 @@ export interface HandoffItem {
   apply_url: string | null;
 }
 
+// ------------------------------------------------------------------ apply assistant (assist.py)
+/** The assistant never touches the job site: it only hands prepared values to the user's clipboard. */
+export interface AssistQueueItem {
+  application_id: number;
+  state: AppState;
+  score: number | null;
+  title: string;
+  employer: string;
+  site: string;
+  apply_url: string | null;
+  ready: boolean; // APPROVED
+  handoff_open: boolean;
+  open_items: number;
+}
+
+export interface AssistField {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export interface AssistAnswer {
+  index: number;
+  question: string;
+  key: string;
+  status: AnswerStatus;
+  required: boolean;
+  sensitive: boolean;
+  note: string;
+  file: "resume" | "cover_letter" | null;
+  answer_id: number | null;
+  /** "••••••" when sensitive (fetch it with assistReveal only when copying); null when there is nothing to paste. */
+  value: string | null;
+}
+
+export interface AssistOtherAnswer {
+  answer_id: number;
+  key: string;
+  label: string;
+  sensitive: boolean;
+  value: string; // masked when sensitive
+}
+
+export interface AssistOpenItem {
+  question: string;
+  key: string;
+  status: string;
+  note: string;
+}
+
+export interface AssistData {
+  application: { id: number; state: AppState; score: number | null; notes: string | null };
+  job: Job;
+  site: string;
+  self_apply_note: string | null;
+  source_attribution: string | null;
+  prior_applications: PriorApplication[];
+  ready: boolean;
+  can_approve: boolean;
+  can_prepare: boolean;
+  packet: { id: number; version: number; approved_at: ISODate | null } | null;
+  fields: AssistField[];
+  answers: AssistAnswer[];
+  other_answers: AssistOtherAnswer[];
+  cover_letter_text: string | null;
+  downloads: { resume_docx: string; cover_letter_txt: string } | null;
+  open_items: AssistOpenItem[];
+  next_application_id: number | null;
+  queue_position: number | null;
+  queue_length: number;
+}
+
+export interface RevealResult {
+  answer_id: number;
+  key: string;
+  value: string;
+}
+
 // ------------------------------------------------------------------ endpoints
 const q = (params: Record<string, string | number | boolean | null | undefined>): string => {
   const sp = new URLSearchParams();
@@ -776,6 +854,13 @@ export const api = {
   setJobDescription: (jobId: number, description: string) => request<Job>("PUT", `/jobs/${jobId}/description`, { description }),
   /** User-initiated, one Dice job at a time. Never call this in a loop. */
   fetchJobDetails: (jobId: number) => request<Job>("POST", `/jobs/${jobId}/fetch-details`, {}),
+
+  // apply assistant
+  assistQueue: () => request<AssistQueueItem[]>("GET", "/assist/queue"),
+  assist: (appId: number) => request<AssistData>("GET", `/applications/${appId}/assist`),
+  /** Admin only, audited server-side. Copy the value straight to the clipboard; never keep or render it. */
+  assistReveal: (applicationId: number, answerId: number) =>
+    request<RevealResult>("POST", "/assist/reveal", { application_id: applicationId, answer_id: answerId }),
 
   // handoffs
   handoffs: (status = "OPEN") => request<HandoffItem[]>("GET", `/handoffs${q({ status })}`),

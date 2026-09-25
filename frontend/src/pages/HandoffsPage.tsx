@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { openAssistant } from "../components/assist";
 import { useApp } from "../components/context";
 import { useAction, useAsync } from "../components/useAsync";
 import { ActionFeedback, Badge, Empty, ErrorBox, Loading, SafeLink, StateBadge, fmtDate } from "../components/ui";
@@ -47,7 +48,8 @@ export function HandoffsPage() {
               )}
               <div className="handoff-actions">
                 <SafeLink href={h.apply_url}>Open application page ↗</SafeLink>
-                <button className="btn btn-small btn-primary" onClick={() => navigate(`#jobs/${h.application_id}`)}>Open application #{h.application_id}</button>
+                <button className="btn btn-small btn-primary" onClick={() => openAssistant(h.application_id, navigate)}>Apply with assistant</button>
+                <button className="btn btn-small" onClick={() => navigate(`#jobs/${h.application_id}`)}>Open application #{h.application_id}</button>
                 {canWrite && status === "OPEN" && (
                   <button className="btn btn-small" disabled={act.busy}
                     onClick={async () => {

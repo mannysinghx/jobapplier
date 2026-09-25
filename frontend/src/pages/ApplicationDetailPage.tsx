@@ -3,6 +3,7 @@ import {
   api, canTransition, type ApplicationDetail, type AutoSubmitPolicy, type LetterGeneration, type MatchData, type Packet, type StandardAnswer,
   type SubmitResult,
 } from "../api";
+import { openAssistant } from "../components/assist";
 import { useApp } from "../components/context";
 import { useAction, useAsync, type ActionState } from "../components/useAsync";
 import {
@@ -145,6 +146,7 @@ function SummaryOnlyPanel({ a, onChanged }: { a: ApplicationDetail; onChanged: (
 }
 
 function JobHeader({ a, onRefresh, loading }: { a: ApplicationDetail; onRefresh: () => void; loading: boolean }) {
+  const { navigate } = useApp();
   const j = a.job;
   const meta = j.meta ?? {};
   const salary = j.salary_min !== null || j.salary_max !== null
@@ -188,6 +190,10 @@ function JobHeader({ a, onRefresh, loading }: { a: ApplicationDetail; onRefresh:
       </div>
       <div className="job-links small">
         <span>Apply: <SafeLink href={j.apply_url}>open application page ↗</SafeLink></span>
+        <button className="btn btn-small btn-primary" onClick={() => openAssistant(a.id, navigate)}
+          title="Compact pop-out with every prepared value to copy. Nothing is automated on the job site.">
+          Open Apply Assistant
+        </button>
         {j.canonical_url && j.canonical_url !== j.apply_url && <span>Listing: <SafeLink href={j.canonical_url}>view listing ↗</SafeLink></span>}
       </div>
       {MANUAL_APPLY_SITES.has(j.site) && (

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorMessage, setCsrfToken, setUnauthorizedHandler, type Controls, type Me } from "./api";
+import { openInMainWindow } from "./components/assist";
 import { AppContext, type AppCtx } from "./components/context";
 import { Login } from "./components/Login";
 import { Badge, Loading } from "./components/ui";
 import { AnswersPage } from "./pages/AnswersPage";
 import { ApplicationDetailPage } from "./pages/ApplicationDetailPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
+import { ApplyQueuePage } from "./pages/ApplyQueuePage";
+import { AssistPage } from "./pages/AssistPage";
 import { ControlsPage } from "./pages/ControlsPage";
 import { FactsPage } from "./pages/FactsPage";
 import { HandoffsPage } from "./pages/HandoffsPage";
@@ -22,10 +25,12 @@ const TABS = [
   { id: "sources", label: "Sources" },
   { id: "import", label: "Import" },
   { id: "jobs", label: "Jobs" },
+  { id: "apply", label: "Apply" },
   { id: "handoffs", label: "Handoffs" },
   { id: "controls", label: "Controls & Privacy" },
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+/** "assist" is a hidden route: the compact pop-out Apply Assistant (#assist/{id}), shown without the tab bar. */
+type TabId = (typeof TABS)[number]["id"] | "assist";
 
 interface Route {
   tab: TabId;
@@ -35,7 +40,7 @@ interface Route {
 function parseHash(): Route {
   const raw = window.location.hash.replace(/^#\/?/, "");
   const [head, ...rest] = raw.split("/");
-  const tab = (TABS.find((t) => t.id === head)?.id ?? "profile") as TabId;
+  const tab: TabId = head === "assist" ? "assist" : (TABS.find((t) => t.id === head)?.id ?? "profile");
   return { tab, sub: rest.length ? decodeURIComponent(rest.join("/")) : null };
 }
 
@@ -130,6 +135,37 @@ export default function App() {
     );
   }
 
+  const pausedBanner = controls?.paused ? (
+    <div className="paused-banner" role="alert">
+      <strong>PAUSED</strong> — polling and submission are halted
+      {controls.kill_switch_file ? " (kill-switch file present on the host)" : ""}
+      {controls.reason ? `. Reason: ${controls.reason}` : ""}.{" "}
+      <a href="#controls">Controls</a>
+    </div>
+  ) : null;
+
+  // Compact pop-out: slim header only, no tab bar.
+  if (route.tab === "assist") {
+    const assistId = route.sub && /^\d+$/.test(route.sub) ? Number(route.sub) : null;
+    return (
+      <AppContext.Provider value={ctx}>
+        <header className="assist-header">
+          <span className="brand">jobApplier</span>
+          {assistId !== null && (
+            <a href={`#jobs/${assistId}`} className="small"
+              onClick={(e) => { e.preventDefault(); openInMainWindow(`#jobs/${assistId}`); }}>
+              Open full view ↗
+            </a>
+          )}
+        </header>
+        {pausedBanner}
+        <main className="assist-main">
+          {assistId !== null ? <AssistPage key={assistId} id={assistId} /> : <div className="alert alert-bad">No application selected.</div>}
+        </main>
+      </AppContext.Provider>
+    );
+  }
+
   return (
     <AppContext.Provider value={ctx}>
       <header className="app-header">
@@ -149,14 +185,7 @@ export default function App() {
           ))}
         </nav>
       </header>
-      {controls?.paused ? (
-        <div className="paused-banner" role="alert">
-          <strong>PAUSED</strong> — polling and submission are halted
-          {controls.kill_switch_file ? " (kill-switch file present on the host)" : ""}
-          {controls.reason ? `. Reason: ${controls.reason}` : ""}.{" "}
-          <a href="#controls">Controls</a>
-        </div>
-      ) : null}
+      {pausedBanner}
       {controlsError ? <div className="alert alert-warn page-alert">Could not load pause state: {controlsError}</div> : null}
       <main className="main">
         {route.tab === "profile" && <ProfilePage />}
@@ -167,6 +196,7 @@ export default function App() {
         {route.tab === "import" && <ImportPage />}
         {route.tab === "jobs" &&
           (route.sub && /^\d+$/.test(route.sub) ? <ApplicationDetailPage id={Number(route.sub)} /> : <ApplicationsPage />)}
+        {route.tab === "apply" && <ApplyQueuePage />}
         {route.tab === "handoffs" && <HandoffsPage />}
         {route.tab === "controls" && <ControlsPage />}
       </main>
