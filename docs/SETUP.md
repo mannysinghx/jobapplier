@@ -36,6 +36,11 @@ Create the admin (you choose the password; the TOTP URI prints only in your term
 ```bash
 railway ssh --project jobapplier2026 --service jobapplier -- python -m app.cli create-admin admin
 ```
+Lost your authenticator, or never added the key? Issue a new one (the old entry stops working and you are signed out):
+```bash
+railway ssh --service jobapplier -- python -m app.cli reset-mfa admin
+```
+Both commands print a QR code to scan plus a setup key to type in by hand.
 Kill switch on Railway: `railway ssh ... -- touch /data/KILL_SWITCH`, or the Pause button.
 Limitations on Railway: the local Ollama model on your Mac is not reachable (cover letters use the template). The consented-folder import can't see your Mac's folders; use upload instead. The container runs as root because Railway mounts volumes root-owned.
 

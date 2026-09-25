@@ -228,7 +228,7 @@ def application_detail(app_id: int, db: Session = Depends(get_db), user: User = 
                      for s in db.execute(select(SubmissionAttempt).where(SubmissionAttempt.application_id == a.id)).scalars()],
         "auto_submit_policy": {"allowed": decision.allowed, "reasons": decision.reasons, "checks": decision.checks},
         "prior_applications": policy.prior_applications(db, a.profile_id, a.job),
-        "source_attribution": (db.get(Source, a.job.source_key).registry_entry or {}).get("attribution") if db.get(Source, a.job.source_key) else None,
+        "source_attribution": (db.get(Source, a.job.source_key).registry_entry or {}).get("display_notice") if db.get(Source, a.job.source_key) else None,
         "notes": a.notes,
     }
 

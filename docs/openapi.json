@@ -197,6 +197,56 @@
     }
    }
   },
+  "/api/llm": {
+   "get": {
+    "summary": "Llm Status",
+    "operationId": "llm_status_api_llm_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "summary": "Llm Update",
+    "operationId": "llm_update_api_llm_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LLMIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/audit": {
    "get": {
     "summary": "List Audit",
@@ -1971,6 +2021,255 @@
     }
    }
   },
+  "/api/imports/alert-emails": {
+   "post": {
+    "summary": "Import Alert Emails",
+    "description": "Upload job-alert emails (.eml, .mbox, or .zip of .eml) exported from your own mailbox.",
+    "operationId": "import_alert_emails_api_imports_alert_emails_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_import_alert_emails_api_imports_alert_emails_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/jobs/manual": {
+   "post": {
+    "summary": "Add Manual Job",
+    "description": "Add a listing you are viewing on any site (LinkedIn, Indeed, ZipRecruiter, Dice, Ladders, ...).",
+    "operationId": "add_manual_job_api_jobs_manual_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ManualJobIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/jobs/{job_id}/description": {
+   "put": {
+    "summary": "Set Description",
+    "operationId": "set_description_api_jobs__job_id__description_put",
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Job Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DescriptionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/jobs/{job_id}/fetch-details": {
+   "post": {
+    "summary": "Fetch Details",
+    "description": "User-initiated: fetch one Dice job's full description via Dice's official MCP server.",
+    "operationId": "fetch_details_api_jobs__job_id__fetch_details_post",
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Job Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/assist/queue": {
+   "get": {
+    "summary": "Assist Queue",
+    "operationId": "assist_queue_api_assist_queue_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/applications/{app_id}/assist": {
+   "get": {
+    "summary": "Assist",
+    "operationId": "assist_api_applications__app_id__assist_get",
+    "parameters": [
+     {
+      "name": "app_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "App Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/assist/reveal": {
+   "post": {
+    "summary": "Reveal",
+    "description": "Returns one approved answer's value for copying. Audited (key only, never the value).",
+    "operationId": "reveal_api_assist_reveal_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RevealIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/health": {
    "get": {
     "summary": "Health",
@@ -2075,9 +2374,15 @@
       "title": "Source Key"
      },
      "board_token": {
-      "type": "string",
-      "maxLength": 120,
-      "minLength": 1,
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 120
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Board Token"
      },
      "employer_name": {
@@ -2091,12 +2396,23 @@
        }
       ],
       "title": "Employer Name"
+     },
+     "params": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Params"
      }
     },
     "type": "object",
     "required": [
-     "source_key",
-     "board_token"
+     "source_key"
     ],
     "title": "BoardIn"
    },
@@ -2112,6 +2428,20 @@
      "enabled"
     ],
     "title": "BoardPatch"
+   },
+   "Body_import_alert_emails_api_imports_alert_emails_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_import_alert_emails_api_imports_alert_emails_post"
    },
    "Body_linkedin_export_api_documents_linkedin_export_post": {
     "properties": {
@@ -2178,6 +2508,21 @@
      "confirm"
     ],
     "title": "DeleteIn"
+   },
+   "DescriptionIn": {
+    "properties": {
+     "description": {
+      "type": "string",
+      "maxLength": 60000,
+      "minLength": 20,
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "title": "DescriptionIn"
    },
    "FactCreate": {
     "properties": {
@@ -2308,6 +2653,26 @@
     ],
     "title": "ImportIn"
    },
+   "LLMIn": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "model": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Model"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled",
+     "model"
+    ],
+    "title": "LLMIn"
+   },
    "LoginIn": {
     "properties": {
      "username": {
@@ -2341,6 +2706,71 @@
      "password"
     ],
     "title": "LoginIn"
+   },
+   "ManualJobIn": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "maxLength": 600,
+      "minLength": 9,
+      "title": "Url"
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Title"
+     },
+     "employer": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Employer"
+     },
+     "location": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Location"
+     },
+     "salary": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 120
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Salary"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 60000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url",
+     "title",
+     "employer"
+    ],
+    "title": "ManualJobIn"
    },
    "ManualSubmission": {
     "properties": {
@@ -2654,6 +3084,24 @@
     },
     "type": "object",
     "title": "RetentionIn"
+   },
+   "RevealIn": {
+    "properties": {
+     "application_id": {
+      "type": "integer",
+      "title": "Application Id"
+     },
+     "answer_id": {
+      "type": "integer",
+      "title": "Answer Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "application_id",
+     "answer_id"
+    ],
+    "title": "RevealIn"
    },
    "SourcePatch": {
     "properties": {

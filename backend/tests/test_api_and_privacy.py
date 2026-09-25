@@ -167,3 +167,34 @@ def test_retention_purges_through_maintenance_window(db):
     db.commit()
     assert n >= 1
     assert db.query(AuditEvent).filter_by(action="audit.purged").count() >= 1
+
+
+def test_reset_mfa_replaces_secret_and_signs_out(authed, db, admin, capsys):
+    import io
+
+    import pyotp
+
+    from app.cli import print_totp_setup
+    from app.models import User, UserSession
+    from app.security.auth import reset_totp
+
+    old_secret = db.query(User).filter_by(username="admin").one().totp_secret
+    assert db.query(UserSession).count() == 1
+    _, uri, secret = reset_totp(db, "admin", "cli")
+    db.expire_all()
+    assert secret != old_secret and db.query(User).one().totp_secret == secret
+    assert db.query(UserSession).count() == 0
+    assert authed.get("/api/auth/me").status_code == 401  # signed out everywhere
+    assert db.query(AuditEvent).filter_by(action="user.mfa_reset").count() == 1
+    # old authenticator code no longer works; new one does
+    r = authed.post("/api/auth/login", json={"username": "admin", "password": admin["password"], "totp": admin["totp"].now()})
+    assert r.status_code == 401
+    r = authed.post("/api/auth/login", json={"username": "admin", "password": admin["password"], "totp": pyotp.TOTP(secret).now()})
+    assert r.status_code == 200
+    buf = io.StringIO()
+    print_totp_setup(uri, buf)
+    text = buf.getvalue()
+    grouped = " ".join(secret[i:i + 4] for i in range(0, len(secret), 4))
+    assert grouped in text and "jobApplier:admin" in text and ("█" in text or "▀" in text)
+    with pytest.raises(ValueError):
+        reset_totp(db, "nobody", "cli")

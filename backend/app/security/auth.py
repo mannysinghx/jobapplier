@@ -55,6 +55,20 @@ def create_user(db: Session, username: str, password: str, role: str = "admin", 
     return u, uri
 
 
+def reset_totp(db: Session, username: str, actor: str) -> tuple[User, str, str]:
+    """Issue a NEW TOTP secret for an existing user and sign them out everywhere. Returns (user, otpauth_uri, secret).
+    The old authenticator entry stops working immediately."""
+    user = db.execute(select(User).where(User.username == username)).scalar()
+    if user is None:
+        raise ValueError(f"no user named {username!r}")
+    secret = pyotp.random_base32()
+    user.totp_secret = secret
+    n = db.query(UserSession).filter(UserSession.user_id == user.id).delete(synchronize_session=False)
+    audit.record(db, actor, "user.mfa_reset", "user", user.id, {"sessions_revoked": n})
+    db.commit()
+    return user, pyotp.TOTP(secret).provisioning_uri(name=username, issuer_name="jobApplier"), secret
+
+
 def login(db: Session, response: Response, username: str, password: str, totp: str | None, client: str) -> dict:
     key = f"{username}|{client}"
     if _locked(key):

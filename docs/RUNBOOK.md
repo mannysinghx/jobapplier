@@ -23,7 +23,7 @@ Resume: remove the file (`rm /data/KILL_SWITCH`) **and** click Resume (or `app.c
 
 ## Suspected credential / key compromise
 - **Session**: delete all rows in `sessions` (`DELETE FROM sessions;`) to log everyone out, then change the password (re-create the user).
-- **TOTP**: re-create the admin user to get a new secret.
+- **TOTP** (lost phone or suspected leak): `python -m app.cli reset-mfa <user>` (on Railway via `railway ssh --service jobapplier -- ...`). It issues a new secret, revokes all of that user's sessions, and is audited as `user.mfa_reset`.
 - **Encryption key**: generate a new key, decrypt with the old key and re-encrypt with the new one (a rotation script is on the roadmap). Until then, assume data encrypted under the old key is exposed if the key leaked. Export, delete, then re-import with the new key.
 
 ## Audit integrity

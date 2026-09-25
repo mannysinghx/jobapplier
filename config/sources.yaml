@@ -67,6 +67,7 @@ sources:
     rate_limit_per_minute: 10
     fields: [guid, title, summary, companyName, salary, workplaceTypes, employmentType, postedDate, detailsPageUrl]
     attribution: "These job listings were found using AI-powered search. Please review all job details carefully and verify information directly with employers before applying."
+    display_notice: "These job listings were found using AI-powered search. Please review all job details carefully and verify information directly with employers before applying."
     read_permitted: true
     read_basis: "Dice MCP docs list 'Custom MCP clients' as supported and state 'No authentication is required for basic usage.' Search via Dice's official server, not scraping (ToS 8.2(aa) bans scrapers)."
     submit_permitted: false
@@ -83,6 +84,7 @@ sources:
     rate_limit_per_minute: 0
     fields: [title, company, location, salary line, job link]
     attribution: "Imported from your own job-alert emails. Links open the job site in your browser."
+    display_notice: "Imported from your own job-alert emails. Links open the job site in your browser."
     read_permitted: true
     read_basis: "The user's own mailbox: alert emails the sites send to the user. No site is contacted; links are not followed."
     submit_permitted: false
@@ -180,7 +182,8 @@ sources:
 #   date_checked: "YYYY-MM-DD"
 #   rate_limit_per_minute: 10
 #   fields: []
-#   attribution: ""
+#   attribution: ""            # obligations for us (developer-facing)
+#   display_notice: ""         # optional text the UI must show with this source's jobs (user-facing)
 #   read_permitted: false
 #   read_basis: "Quote the exact terms/docs sentence that permits this use."
 #   submit_permitted: false

@@ -9,7 +9,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 
 from . import metrics
-from .api import admin, jobs, profile
+from .api import admin, assist, jobs, profile
 from .config import get_settings
 from .connectors.registry import sync_registry
 from .db import SessionLocal
@@ -67,7 +67,7 @@ def create_app() -> FastAPI:
     async def crypto_err(_, exc):  # noqa: ANN001
         return JSONResponse({"detail": str(exc)}, status_code=500)
 
-    for r in (admin.router, profile.router, jobs.router):
+    for r in (admin.router, profile.router, jobs.router, assist.router):
         app.include_router(r, prefix="/api")
 
     @app.get("/api/health")

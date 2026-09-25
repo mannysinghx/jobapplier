@@ -13,6 +13,8 @@ Base path `/api`. Interactive docs: `/api/docs` (Swagger UI). Machine-readable s
 | POST | `/api/controls/pause` | Pause |
 | POST | `/api/controls/resume` | Resume |
 | PUT | `/api/controls/retention` | Put Retention |
+| GET | `/api/llm` | Llm Status |
+| PUT | `/api/llm` | Llm Update |
 | GET | `/api/audit` | List Audit |
 | GET | `/api/audit/verify` | Verify |
 | GET | `/api/privacy/export` | Export |
@@ -64,6 +66,13 @@ Base path `/api`. Interactive docs: `/api/docs` (Swagger UI). Machine-readable s
 | GET | `/api/applications/{app_id}/cover-letter.txt` | Cover Letter |
 | GET | `/api/handoffs` | List Handoffs |
 | POST | `/api/handoffs/{hid}/dismiss` | Dismiss Handoff |
+| POST | `/api/imports/alert-emails` | Import Alert Emails |
+| POST | `/api/jobs/manual` | Add Manual Job |
+| PUT | `/api/jobs/{job_id}/description` | Set Description |
+| POST | `/api/jobs/{job_id}/fetch-details` | Fetch Details |
+| GET | `/api/assist/queue` | Assist Queue |
+| GET | `/api/applications/{app_id}/assist` | Assist |
+| POST | `/api/assist/reveal` | Reveal |
 | GET | `/api/health` | Health |
 | GET | `/metrics` | Prom |
 

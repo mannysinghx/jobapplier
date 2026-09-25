@@ -56,6 +56,16 @@ Then:
 2. **Approve**.
 3. **Handoff**: open the apply link, submit using the packet, then click **Record manual submission** (optionally with a confirmation number). The packet contents are saved with the record.
 
+## 7b. Apply Assistant (applying by hand, fast)
+For every site that doesn't permit automated applying (all of them today), use the **Apply** tab:
+1. Press **Start** on a job. A narrow panel pops out; put it beside your browser.
+2. Click **Open job page** and sign in to the site as usual, in your own browser.
+3. Fill the site's form by copying from the panel: your details, prepared answers, other approved answers, the cover letter. Download the tailored resume to upload. Sensitive answers are copied only when you click, and each reveal is recorded in the audit log (the key, never the value).
+4. Answer the **Open items** yourself on the site (attestations, anything not in your approved answers).
+5. Submit on the site, then **Record submission** (optionally with the confirmation number) and go to **Next application**.
+Shortcuts: `j`/`k` move, `c`/Enter copy, `o` open the job page, `n` next application.
+Nothing is automated on the job site: the panel only fills your clipboard.
+
 ## 8. Controls & privacy
 - **Pause** stops polling and submissions immediately. For emergencies, see [RUNBOOK.md](RUNBOOK.md).
 - **Export** downloads everything about you as a ZIP. **Delete all** removes it (type `DELETE MY DATA`).
