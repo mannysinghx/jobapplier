@@ -22,6 +22,23 @@ Open http://localhost:5180 and log in with username, password and TOTP code.
 
 Optional upload scanning: `docker compose --profile av up -d` and set `JA_CLAMAV_HOST=clamav` in `.env`.
 
+## Option C: Railway (single service)
+The root `Dockerfile` builds the React UI and serves it from the FastAPI app, so the UI and API share one origin. Polling and retention run in-process (`JA_EMBEDDED_SCHEDULER=true`), which means no Redis or Celery services and **exactly one replica**.
+
+Resources (project `jobapplier2026`, environment `production`):
+- `jobapplier` service built from GitHub `mannysinghx/jobapplier` (main) with the root `Dockerfile`, health check `/api/health`
+- `Postgres` (Railway template); the app reads `JA_DATABASE_URL=${{Postgres.DATABASE_URL}}`
+- Volume `jobapplier-volume` mounted at `/data` (encrypted file store + `KILL_SWITCH` file)
+
+Variables: `JA_ENV=prod`, `JA_ENCRYPTION_KEY` (**back it up** from the Railway dashboard → Variables; without it your data can't be decrypted), `JA_DATA_DIR=/data`, `JA_KILL_SWITCH_FILE=/data/KILL_SWITCH`, `JA_COOKIE_SECURE=true`, `JA_MFA_REQUIRED=true`, `JA_EMBEDDED_SCHEDULER=true`, `JA_METRICS_PUBLIC=false`, `JA_CORS_ORIGINS=["https://<your-domain>"]`.
+
+Create the admin (you choose the password; the TOTP URI prints only in your terminal):
+```bash
+railway ssh --project jobapplier2026 --service jobapplier -- python -m app.cli create-admin admin
+```
+Kill switch on Railway: `railway ssh ... -- touch /data/KILL_SWITCH`, or the Pause button.
+Limitations on Railway: the local Ollama model on your Mac is not reachable (cover letters use the template). The consented-folder import can't see your Mac's folders; use upload instead. The container runs as root because Railway mounts volumes root-owned.
+
 ## Option B: Local development (no Docker)
 ```bash
 cd backend

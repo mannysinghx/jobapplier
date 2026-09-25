@@ -21,7 +21,7 @@ LAST_POLL_KEY = "last_poll"
 
 
 @celery_app.task(name="app.tasks.tick")
-def tick() -> dict:
+def tick() -> dict:  # also called directly by app.scheduler (embedded mode)
     db = SessionLocal()
     try:
         if controls.is_paused(db):

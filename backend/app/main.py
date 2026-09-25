@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 
@@ -22,7 +24,16 @@ async def lifespan(app: FastAPI):
         sync_registry(db)
     finally:
         db.close()
+    s = get_settings()
+    if s.embedded_scheduler:
+        from . import scheduler
+
+        scheduler.start()
     yield
+    if s.embedded_scheduler:
+        from . import scheduler
+
+        scheduler.stop()
 
 
 def create_app() -> FastAPI:
@@ -39,8 +50,17 @@ def create_app() -> FastAPI:
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "no-referrer")
         resp.headers.setdefault("Cache-Control", "no-store")
-        if not request.url.path.startswith("/api/docs"):
+        path = request.url.path
+        if path.startswith("/api/docs"):
+            pass
+        elif path.startswith("/api/") or path == "/metrics":
             resp.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+        else:  # the single-page UI (same policy as frontend/nginx.conf)
+            resp.headers.setdefault("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
+            if path.startswith("/assets/"):
+                resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        if s.cookie_secure:
+            resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return resp
 
     @app.exception_handler(CryptoConfigError)
@@ -62,10 +82,31 @@ def create_app() -> FastAPI:
     @app.get("/metrics")
     def prom():
         # Aggregate counts only, with no personal data. Expose on the private network only.
+        if not s.metrics_public:
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
         metrics.refresh()
         return PlainTextResponse(generate_latest().decode(), media_type=CONTENT_TYPE_LATEST)
 
+    if s.static_dir and (s.static_dir / "index.html").is_file():
+        _mount_ui(app, s.static_dir)
     return app
+
+
+def _mount_ui(app: FastAPI, root: Path) -> None:
+    """Serve the built React UI (same origin as the API, so SameSite=Strict cookies and CSRF work unchanged)."""
+    root = root.resolve()
+    index = root / "index.html"
+    if (root / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith("api/") or path == "api":
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        candidate = (root / path).resolve()
+        if path and candidate.is_relative_to(root) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index, headers={"Cache-Control": "no-store"})
 
 
 app = create_app()

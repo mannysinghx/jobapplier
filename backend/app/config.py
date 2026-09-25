@@ -2,7 +2,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -48,12 +48,27 @@ class Settings(BaseSettings):
     # Hosts other than loopback/private/host.docker.internal, and Ollama ":cloud" models, are refused unless True.
     llm_allow_remote: bool = False
 
+    # PaaS / single-service mode (Railway)
+    static_dir: Path | None = None  # built React UI to serve from the API (same origin)
+    embedded_scheduler: bool = False  # run poll/match/retention in-process instead of Celery (ONE replica only)
+    metrics_public: bool = True  # False = /metrics returns 404 (use when the app is internet-facing)
+
     # Freshness
     listing_old_after_days: int = 60  # matching note only; never expires a still-published listing
     listing_stale_hours: int = 48  # listing must have been seen within this window to be submittable
     # Search-based and imported listings have no "taken down" signal: expire after this many days unseen.
     search_listing_ttl_days: int = 14
     imported_listing_ttl_days: int = 30
+
+
+    @field_validator("database_url")
+    @classmethod
+    def _psycopg_driver(cls, v: str) -> str:
+        """Accept provider URLs (postgres:// or postgresql://) and use the psycopg 3 driver."""
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
 
 @lru_cache
