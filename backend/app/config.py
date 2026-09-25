@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # Freshness
     listing_old_after_days: int = 60  # matching note only; never expires a still-published listing
     listing_stale_hours: int = 48  # listing must have been seen within this window to be submittable
+    # Search-based and imported listings have no "taken down" signal: expire after this many days unseen.
+    search_listing_ttl_days: int = 14
+    imported_listing_ttl_days: int = 30
 
 
 @lru_cache

@@ -38,6 +38,23 @@ def submissions_since(db: Session, since: datetime, source_key: str | None = Non
     return db.execute(q).scalar() or 0
 
 
+def prior_applications(db: Session, profile_id: int, job: Job) -> list[dict]:
+    """Applications already SUBMITTED/CONFIRMED/FOLLOW_UP for the same employer + title on ANY source (location
+    ignored), including ones imported from the LinkedIn export (applied outside this tool)."""
+    from .discovery import dedupe_key
+
+    emp, title = dedupe_key(job.employer, "", None), dedupe_key("", job.title, None)
+    out = []
+    q = (select(Application, Job).join(Job, Job.id == Application.job_id)
+         .where(Application.profile_id == profile_id, Application.job_id != job.id,
+                Application.state.in_(["SUBMITTED", "CONFIRMED", "FOLLOW_UP"])))
+    for other_app, other in db.execute(q):
+        if dedupe_key(other.employer, "", None) == emp and dedupe_key("", other.title, None) == title:
+            out.append({"application_id": other_app.id, "state": other_app.state, "source": other.source_key,
+                        "note": other_app.notes, "updated_at": other_app.updated_at})
+    return out
+
+
 def already_applied(db: Session, app: Application, job: Job) -> bool:
     """Duplicate guard across the idempotency key AND the job's dedupe key (same role re-posted / other source)."""
     if db.execute(select(SubmissionAttempt.id).where(SubmissionAttempt.idempotency_key == app.idempotency_key,
@@ -47,7 +64,7 @@ def already_applied(db: Session, app: Application, job: Job) -> bool:
         select(Application.id).join(Job, Job.id == Application.job_id).where(
             Job.dedupe_key == job.dedupe_key, Application.id != app.id,
             Application.state.in_(["SUBMITTED", "CONFIRMED", "FOLLOW_UP"]))).first()
-    return other is not None
+    return other is not None or bool(prior_applications(db, app.profile_id, job))
 
 
 def evaluate(db: Session, app: Application, now: datetime | None = None) -> PolicyDecision:

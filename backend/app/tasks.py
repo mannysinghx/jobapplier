@@ -40,6 +40,10 @@ def tick() -> dict:
         row.value = {"at": now.isoformat()}
         db.add(row)
         db.commit()
+        from . import imports
+
+        imports.expire_stale_imports(db)
+        db.commit()
         result = pipeline.auto_process(db, profile)
         return {"runs": len(runs), **result}
     finally:

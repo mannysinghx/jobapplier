@@ -47,6 +47,7 @@ class NormalizedJob:
     canonical_url: str | None = None
     apply_url: str | None = None
     requirements: list[str] = field(default_factory=list)
+    meta: dict = field(default_factory=dict)
 
 
 class ConnectorError(RuntimeError):
@@ -76,6 +77,28 @@ def annualize(value, interval: str | None):  # noqa: ANN001, ANN201
         return None
     annual = v * factor
     return annual if 1000 <= annual <= 10_000_000 else None
+
+
+_UNIT = r"(?:\s*(?:/|per|an?)\s*(?:yr|year|hr|hour|annum|month|mo|week|wk|day))?"
+_SAL = re.compile(r"(?P<cur>[$£€]|USD|GBP|EUR|CAD)?\s*(?P<lo>\d[\d,]*(?:\.\d+)?)\s*(?P<lok>[kK])?(?P<lou>" + _UNIT + r")\s*"
+                  r"(?:-|–|to)\s*(?:[$£€]|USD|GBP|EUR|CAD)?\s*(?P<hi>\d[\d,]*(?:\.\d+)?)\s*(?P<hik>[kK])?(?P<rest>.{0,40})")
+_CUR = {"$": "USD", "£": "GBP", "€": "EUR"}
+
+
+def parse_salary_text(s: str | None) -> tuple[float | None, float | None, str | None]:
+    """'$60 - $70 per hour' -> annualized (124800, 145600, 'USD'). Returns Nones when unclear."""
+    if not s:
+        return None, None, None
+    m = _SAL.search(s)
+    if not m:
+        return None, None, None
+    lo = float(m.group("lo").replace(",", "")) * (1000 if m.group("lok") else 1)
+    hi = float(m.group("hi").replace(",", "")) * (1000 if m.group("hik") else 1)
+    rest = (m.group("rest") + " " + (m.group("lou") or "")).lower()
+    interval = next((k for k in ("hour", "hr", "day", "week", "wk", "month", "mo", "year", "yr", "annum", "annual") if k in rest), None)
+    interval = {"hr": "hour", "annum": "year", "yr": "year", "wk": "week", "mo": "month"}.get(interval, interval)
+    cur = m.group("cur")
+    return annualize(lo, interval), annualize(hi, interval), _CUR.get(cur, cur) if cur else None
 
 
 def infer_arrangement(*texts: str | None) -> str:
@@ -112,13 +135,16 @@ def extract_requirements(description: str) -> list[str]:
 
 class Connector(ABC):
     key: str
+    # True: fetch() returns the board's COMPLETE listing, so absence means the job was taken down (expiry).
+    # False (search-based sources): absence means nothing; jobs expire after a TTL instead.
+    complete_listing: bool = True
 
     def __init__(self, client: httpx.Client):
         self.client = client
 
     @abstractmethod
-    def fetch(self, board_token: str) -> list[NormalizedJob]:
-        """Return ALL currently published jobs for the board (used for expiry detection)."""
+    def fetch(self, board_token: str, params: dict | None = None) -> list[NormalizedJob]:
+        """Return the jobs for a board (complete listing) or a saved search (params)."""
 
     def _get_json(self, url: str, params: dict | None = None):
         try:

@@ -166,9 +166,17 @@ async def linkedin_export(file: UploadFile = File(...), db: Session = Depends(ge
     p = get_profile(db)
     data = await _read_upload(file, service.LINKEDIN_MAX_BYTES)
     try:
-        return service.ingest_linkedin_export(db, p, file.filename or "linkedin.zip", data, actor(user))
+        res = service.ingest_linkedin_export(db, p, file.filename or "linkedin.zip", data, actor(user))
     except files.IntakeError as e:
         raise HTTPException(422, str(e)) from e
+    # Saved Jobs + Job Applications from the same export (user's own data)
+    from .. import imports
+
+    try:
+        res["jobs"] = imports.import_linkedin_jobs(db, p.id, data, actor(user))
+    except Exception as e:  # noqa: BLE001 - profile facts were imported; report job import problems separately
+        res["jobs"] = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
+    return res
 
 
 @router.get("/documents/{doc_id}/text")

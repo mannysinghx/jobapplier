@@ -1,13 +1,17 @@
 """Sources, boards, jobs, applications, packets, handoffs, pipeline triggers."""
 import re
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import audit, discovery, pipeline, policy
+from .. import audit, discovery, imports, pipeline, policy
+from ..connectors.base import ConnectorError
+from ..connectors.dice import validate_params as validate_dice_params
+from ..connectors.registry import SourceNotPermitted
+from ..ingestion import email_alerts
 from ..connectors.registry import review_is_current
 from ..db import get_db
 from ..models import Application, Document, HandoffTask, Job, Source, SourceBoard, StandardAnswer, SubmissionAttempt, User
@@ -71,12 +75,14 @@ def patch_source(key: str, body: SourcePatch, db: Session = Depends(get_db), use
 
 class BoardIn(BaseModel):
     source_key: str
-    board_token: str = Field(min_length=1, max_length=120)
+    board_token: str | None = Field(default=None, max_length=120)  # optional for saved searches (auto-named)
     employer_name: str | None = Field(default=None, max_length=200)
+    params: dict | None = None  # saved search for search-based sources (Dice)
 
 
 def board_out(b: SourceBoard) -> dict:
     return {"id": b.id, "source_key": b.source_key, "board_token": b.board_token, "employer_name": b.employer_name,
+            "params": b.params or {},
             "enabled": b.enabled, "consecutive_failures": b.consecutive_failures, "next_attempt_at": b.next_attempt_at,
             "last_success_at": b.last_success_at}
 
@@ -90,12 +96,22 @@ def list_boards(db: Session = Depends(get_db), user: User = Depends(current_user
 def add_board(body: BoardIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     if db.get(Source, body.source_key) is None or body.source_key not in discovery.CONNECTORS:
         raise HTTPException(422, "unknown or unimplemented source")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", body.board_token):
+    params: dict = {}
+    token = body.board_token
+    if not discovery.CONNECTORS[body.source_key].complete_listing:  # search-based: needs a saved search
+        try:
+            params = validate_dice_params(body.params or {})
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+        token = token or re.sub(r"[^A-Za-z0-9_.-]+", "-", f"{params['keyword']}-{params.get('location', 'any')}")[:100].strip("-")
+    elif body.params:
+        raise HTTPException(422, "this source follows employer boards; params are not accepted")
+    if not token or not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", token):
         raise HTTPException(422, "board token may contain only letters, digits, '.', '_' and '-'")
     if db.execute(select(SourceBoard).where(SourceBoard.source_key == body.source_key,
-                                            SourceBoard.board_token == body.board_token)).scalar():
+                                            SourceBoard.board_token == token)).scalar():
         raise HTTPException(409, "board already added")
-    b = SourceBoard(**body.model_dump())
+    b = SourceBoard(source_key=body.source_key, board_token=token, employer_name=body.employer_name, params=params)
     db.add(b)
     db.flush()
     audit.record(db, actor(user), "board.added", "source_board", b.id, {"source": b.source_key, "board": b.board_token})
@@ -157,7 +173,8 @@ def job_out(j: Job) -> dict:
             "employment_type": j.employment_type, "salary_min": j.salary_min, "salary_max": j.salary_max,
             "salary_currency": j.salary_currency, "posted_at": j.posted_at, "first_seen_at": j.first_seen_at,
             "last_seen_at": j.last_seen_at, "expired_at": j.expired_at, "expires_at": j.expires_at, "duplicate_of_id": j.duplicate_of_id,
-            "canonical_url": j.canonical_url, "apply_url": j.apply_url, "permission": j.permission}
+            "canonical_url": j.canonical_url, "apply_url": j.apply_url, "permission": j.permission,
+            "meta": j.meta or {}, "site": (j.meta or {}).get("site") or j.source_key}
 
 
 def app_summary(a: Application) -> dict:
@@ -210,6 +227,9 @@ def application_detail(app_id: int, db: Session = Depends(get_db), user: User = 
                       "finished_at": s.finished_at}
                      for s in db.execute(select(SubmissionAttempt).where(SubmissionAttempt.application_id == a.id)).scalars()],
         "auto_submit_policy": {"allowed": decision.allowed, "reasons": decision.reasons, "checks": decision.checks},
+        "prior_applications": policy.prior_applications(db, a.profile_id, a.job),
+        "source_attribution": (db.get(Source, a.job.source_key).registry_entry or {}).get("attribution") if db.get(Source, a.job.source_key) else None,
+        "notes": a.notes,
     }
 
 
@@ -358,3 +378,73 @@ def dismiss_handoff(hid: int, db: Session = Depends(get_db), user: User = Depend
     audit.record(db, actor(user), "handoff.dismissed", "application", h.application_id)
     db.commit()
     return {"id": h.id, "status": h.status}
+
+
+# ------------------------------------------------------------------ user imports (no scraping)
+@router.post("/imports/alert-emails")
+async def import_alert_emails(file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """Upload job-alert emails (.eml, .mbox, or .zip of .eml) exported from your own mailbox."""
+    data = await file.read(email_alerts.MAX_BYTES + 1)
+    if len(data) > email_alerts.MAX_BYTES:
+        raise HTTPException(413, "file too large (max 50 MB)")
+    try:
+        res = imports.import_alert_emails(db, file.filename or "alerts.eml", data, actor(user))
+    except (email_alerts.AlertImportError, SourceNotPermitted) as e:
+        raise HTTPException(422, str(e)) from e
+    res["matched"] = pipeline.match_jobs(db, get_profile(db), actor(user))
+    return res
+
+
+class ManualJobIn(BaseModel):
+    url: str = Field(min_length=9, max_length=600)
+    title: str = Field(min_length=1, max_length=300)
+    employer: str = Field(min_length=1, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    salary: str | None = Field(default=None, max_length=120)
+    description: str | None = Field(default=None, max_length=60_000)
+
+
+@router.post("/jobs/manual")
+def add_manual_job(body: ManualJobIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """Add a listing you are viewing on any site (LinkedIn, Indeed, ZipRecruiter, Dice, Ladders, ...)."""
+    try:
+        job, suggestion = imports.add_manual_job(db, body.url, body.title, body.employer, actor(user),
+                                                 body.location, body.description, body.salary)
+    except (ValueError, SourceNotPermitted) as e:
+        raise HTTPException(422, str(e)) from e
+    pipeline.match_jobs(db, get_profile(db), actor(user))
+    app = db.execute(select(Application).where(Application.job_id == job.id)).scalar()
+    return {"job": job_out(job), "application_id": app.id if app else None, "suggested_board": suggestion}
+
+
+class DescriptionIn(BaseModel):
+    description: str = Field(min_length=20, max_length=60_000)
+
+
+@router.put("/jobs/{job_id}/description")
+def set_description(job_id: int, body: DescriptionIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404)
+    try:
+        imports.set_description(db, job, body.description, actor(user))
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    pipeline.match_jobs(db, get_profile(db), actor(user))
+    return job_out(job)
+
+
+@router.post("/jobs/{job_id}/fetch-details")
+def fetch_details(job_id: int, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """User-initiated: fetch one Dice job's full description via Dice's official MCP server."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404)
+    try:
+        imports.fetch_dice_details(db, job, actor(user))
+    except (ValueError, SourceNotPermitted) as e:
+        raise HTTPException(409, str(e)) from e
+    except ConnectorError as e:
+        raise HTTPException(502, f"Dice: {e}") from e
+    pipeline.match_jobs(db, get_profile(db), actor(user))
+    return job_out(job)

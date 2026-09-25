@@ -57,22 +57,118 @@ sources:
     submit_basis: "API is read-only; candidates apply on Ashby's hosted page."
     notes: "Re-check terms quarterly; docs do not address third-party aggregation explicitly."
 
-  # ---------------------------------------------------------------- NOT IMPLEMENTED / NOT PERMITTED
+  - key: dice
+    name: Dice (official MCP job search)
+    method: mcp_search
+    base_url: https://mcp.dice.com/mcp
+    docs_url: https://www.dice.com/about/mcp
+    terms_url: https://www.dice.com/about/terms-and-conditions
+    date_checked: "2026-09-24"
+    rate_limit_per_minute: 10
+    fields: [guid, title, summary, companyName, salary, workplaceTypes, employmentType, postedDate, detailsPageUrl]
+    attribution: "These job listings were found using AI-powered search. Please review all job details carefully and verify information directly with employers before applying."
+    read_permitted: true
+    read_basis: "Dice MCP docs list 'Custom MCP clients' as supported and state 'No authentication is required for basic usage.' Search via Dice's official server, not scraping (ToS 8.2(aa) bans scrapers)."
+    submit_permitted: false
+    submit_basis: "Tool description: 'DO NOT use for: applying to jobs'. ToS 8.2(j) bans unapproved tools. Apply on dice.com (handoff)."
+    notes: "Saved searches, not employer boards. get_job_details only on user request (tool guidance). Must display the AI-search disclosure. ToS 8.2(k): never use Dice data to train/improve ML models (descriptions are never sent to the LLM)."
+
+  - key: email_alert
+    name: Job-alert emails (LinkedIn, Indeed, ZipRecruiter, Dice, Ladders)
+    method: user_mailbox_import
+    base_url: ""
+    docs_url: https://www.linkedin.com/help/linkedin/answer/a511279
+    terms_url: ""
+    date_checked: "2026-09-24"
+    rate_limit_per_minute: 0
+    fields: [title, company, location, salary line, job link]
+    attribution: "Imported from your own job-alert emails. Links open the job site in your browser."
+    read_permitted: true
+    read_basis: "The user's own mailbox: alert emails the sites send to the user. No site is contacted; links are not followed."
+    submit_permitted: false
+    submit_basis: "All five sites prohibit automated applying (e.g. Indeed A.3.5; LinkedIn User Agreement 8.2). Handoff only."
+    notes: "Only mail from the sites' own domains is parsed. Job links must point at the site's own domain. Listings expire after JA_IMPORTED_LISTING_TTL_DAYS unseen."
+
+  - key: user_import
+    name: Your own imports (manual add, LinkedIn data export)
+    method: user_provided
+    base_url: ""
+    docs_url: https://www.linkedin.com/help/linkedin/answer/a1339364
+    terms_url: ""
+    date_checked: "2026-09-24"
+    rate_limit_per_minute: 0
+    fields: [url, title, company, description (pasted), saved/applied date]
+    attribution: ""
+    read_permitted: true
+    read_basis: "Data the user provides: pasted listings, or the user's own LinkedIn export (Saved Jobs, Job Applications)."
+    submit_permitted: false
+    submit_basis: "No automated submission to any job site. Handoff only."
+    notes: "LinkedIn 'Job Applications' rows become SUBMITTED (external) records so the duplicate guard knows about them."
+
+  # ---------------------------------------------------------------- SITES: direct access NOT PERMITTED
   - key: linkedin
-    name: LinkedIn
+    name: LinkedIn (direct)
     method: none
     base_url: ""
-    docs_url: https://www.linkedin.com/legal/user-agreement
+    docs_url: https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview
     terms_url: https://www.linkedin.com/legal/user-agreement
     date_checked: "2026-09-24"
     rate_limit_per_minute: 0
     fields: []
     attribution: ""
     read_permitted: false
-    read_basis: "User Agreement prohibits scraping and automated access. Only the user's own data export ZIP is accepted."
+    read_basis: "User Agreement 8.2 bans software/scripts/bots that scrape or copy the Services. The Job Posting API is not accepting new partners; Apply Connect is ATS-only."
     submit_permitted: false
-    submit_basis: "No permitted candidate-side submission API."
-    notes: "Profile URL and the user-downloaded data export are supported as profile context only."
+    submit_basis: "Bots and unauthorized automated methods banned (8.2); no candidate apply API."
+    notes: "Supported instead via email_alert and user_import (data export: Saved Jobs, Job Applications)."
+
+  - key: indeed
+    name: Indeed (direct)
+    method: none
+    base_url: ""
+    docs_url: https://docs.indeed.com/legal-terms/indeed-apply
+    terms_url: https://www.indeed.com/legal
+    date_checked: "2026-09-24"
+    rate_limit_per_minute: 0
+    fields: []
+    attribution: ""
+    read_permitted: false
+    read_basis: "Terms 21: no automated systems (bots, scrapers, spiders, AI or Agentic AI) without express written permission. Publisher API closed; RSS removed."
+    submit_permitted: false
+    submit_basis: "A.3.5: 'Use of any automation, scripting, or bots to automate the Indeed Apply process outside of Indeed's official vendors and tooling is prohibited.'"
+    notes: "Supported instead via email_alert and user_import. Indeed's official Claude connector is Claude-only and cannot be used by this app."
+
+  - key: ziprecruiter
+    name: ZipRecruiter (direct)
+    method: none
+    base_url: ""
+    docs_url: https://www.ziprecruiter.com/partner/documentation/mcp-connector/
+    terms_url: https://www.ziprecruiter.global/en/terms
+    date_checked: "2026-09-24"
+    rate_limit_per_minute: 0
+    fields: []
+    attribution: ""
+    read_permitted: false
+    read_basis: "Terms ban crawling/scraping and automated means. The Job Search MCP is documented for AI assistants via the Anthropic/ChatGPT directories; no public endpoint or terms for self-hosted clients, so NOT verified."
+    submit_permitted: false
+    submit_basis: "No candidate apply API; partner API is ATS/HRIS/staffing only."
+    notes: "Supported instead via email_alert and user_import. Re-review if ZipRecruiter publishes MCP terms for custom clients."
+
+  - key: ladders
+    name: Ladders (direct)
+    method: none
+    base_url: ""
+    docs_url: ""
+    terms_url: https://www.theladders.com/corporate/terms
+    date_checked: "2026-09-24"
+    rate_limit_per_minute: 0
+    fields: []
+    attribution: ""
+    read_permitted: false
+    read_basis: "Terms ban 'any robot, spider, scraper or other automated means to access the Site.' No job-seeker API."
+    submit_permitted: false
+    submit_basis: "No third-party apply route (Ladders sells its own Apply4Me)."
+    notes: "Supported instead via email_alert and user_import."
 
 # ---------------------------------------------------------------- TEMPLATE
 # - key: example

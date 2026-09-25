@@ -50,7 +50,7 @@ class GreenhouseConnector(Connector):
     key = "greenhouse"
     BASE = "https://boards-api.greenhouse.io/v1/boards"
 
-    def fetch(self, board_token: str) -> list[NormalizedJob]:
+    def fetch(self, board_token: str, params: dict | None = None) -> list[NormalizedJob]:
         tok = _safe_token(board_token)
         data = self._get_json(f"{self.BASE}/{tok}/jobs", params={"content": "true", "pay_transparency": "true"})
         out = []
@@ -94,7 +94,7 @@ class LeverConnector(Connector):
     key = "lever"
     BASE = "https://api.lever.co/v0/postings"
 
-    def fetch(self, board_token: str) -> list[NormalizedJob]:
+    def fetch(self, board_token: str, params: dict | None = None) -> list[NormalizedJob]:
         tok = _safe_token(board_token)
         data = self._get_json(f"{self.BASE}/{tok}", params={"mode": "json"})
         out = []
@@ -131,7 +131,7 @@ class AshbyConnector(Connector):
     key = "ashby"
     BASE = "https://api.ashbyhq.com/posting-api/job-board"
 
-    def fetch(self, board_token: str) -> list[NormalizedJob]:
+    def fetch(self, board_token: str, params: dict | None = None) -> list[NormalizedJob]:
         tok = _safe_token(board_token)
         data = self._get_json(f"{self.BASE}/{tok}", params={"includeCompensation": "true"})
         out = []
@@ -168,6 +168,8 @@ class AshbyConnector(Connector):
         return out
 
 
+from .dice import DiceConnector  # noqa: E402
+
 CONNECTORS: dict[str, type[Connector]] = {
-    c.key: c for c in (GreenhouseConnector, LeverConnector, AshbyConnector)
+    c.key: c for c in (GreenhouseConnector, LeverConnector, AshbyConnector, DiceConnector)
 }

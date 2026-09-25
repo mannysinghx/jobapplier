@@ -60,14 +60,18 @@ def make_client() -> httpx.Client:
                         follow_redirects=False)
 
 
-def upsert_jobs(db: Session, source: Source, board: SourceBoard, jobs: list[NormalizedJob], now: datetime) -> tuple[int, int]:
+def upsert_jobs(db: Session, source: Source, board: SourceBoard | None, jobs: list[NormalizedJob], now: datetime,
+                complete_listing: bool = True, ttl_days: int | None = None, board_token: str | None = None) -> tuple[int, int]:
+    """complete_listing: absence from `jobs` expires a job. Otherwise jobs expire ttl_days after they were last seen.
+    board may be None for user imports (email alerts, manual, LinkedIn export); then board_token names the site."""
+    token = board.board_token if board is not None else (board_token or "import")
     new = 0
     seen_ids = set()
     for nj in jobs:
         if not nj.external_id or not nj.title:
             continue
         seen_ids.add(nj.external_id)
-        employer = board.employer_name or nj.employer
+        employer = (board.employer_name if board is not None else None) or nj.employer
         existing = db.execute(select(Job).where(Job.source_key == source.key, Job.external_id == nj.external_id)).scalar()
         ch = content_hash(nj)
         fields = dict(
@@ -80,14 +84,18 @@ def upsert_jobs(db: Session, source: Source, board: SourceBoard, jobs: list[Norm
             dedupe_key=dedupe_key(employer, nj.title, nj.location), content_hash=ch,
         )
         if existing:
+            keep_desc = (existing.meta or {}).get("details_fetched") or (existing.meta or {}).get("description_by_user")
             for k, v in fields.items():
+                if k in ("description", "requirements") and keep_desc:
+                    continue  # never overwrite a fetched/user-provided full description with a summary
                 setattr(existing, k, v)
+            existing.meta = {**(existing.meta or {}), **nj.meta}
             existing.last_seen_at = now
             if existing.expired_at is not None:  # re-listed
                 existing.expired_at = None
             continue
-        job = Job(source_key=source.key, board_token=board.board_token, external_id=nj.external_id,
-                  first_seen_at=now, last_seen_at=now, **fields)
+        job = Job(source_key=source.key, board_token=token, external_id=nj.external_id,
+                  first_seen_at=now, last_seen_at=now, meta=dict(nj.meta), **fields)
         # Cross-source / re-post duplicate: same employer+title+location already active
         dup = db.execute(select(Job).where(Job.dedupe_key == job.dedupe_key, Job.expired_at.is_(None),
                                            Job.duplicate_of_id.is_(None))).scalar()
@@ -100,10 +108,12 @@ def upsert_jobs(db: Session, source: Source, board: SourceBoard, jobs: list[Norm
     # Expiry: jobs from this board that the (complete) listing no longer contains
     expired = 0
     # Age alone never expires a listing: if the employer still publishes it, it is open (age is a matching note).
-    for job in db.execute(select(Job).where(Job.source_key == source.key, Job.board_token == board.board_token,
+    for job in db.execute(select(Job).where(Job.source_key == source.key, Job.board_token == token,
                                             Job.expired_at.is_(None))).scalars():
         past_deadline = job.expires_at is not None and job.expires_at < now
-        if job.external_id not in seen_ids or past_deadline:
+        gone = job.external_id not in seen_ids if complete_listing else False
+        stale = ttl_days is not None and job.last_seen_at < now - timedelta(days=ttl_days)
+        if gone or past_deadline or stale:
             job.expired_at = now
             expired += 1
             _expire_applications(db, job)
@@ -126,9 +136,11 @@ def poll_board(db: Session, source: Source, board: SourceBoard, connector: Conne
         if controls.is_paused(db):
             raise SourceNotPermitted("global pause is on")
         RateLimiter.wait(source.key, source.rate_limit_per_minute)
-        jobs = connector.fetch(board.board_token)
+        jobs = connector.fetch(board.board_token, board.params or None)
         run.jobs_seen = len(jobs)
-        run.jobs_new, run.jobs_expired = upsert_jobs(db, source, board, jobs, now)
+        run.jobs_new, run.jobs_expired = upsert_jobs(
+            db, source, board, jobs, now, complete_listing=connector.complete_listing,
+            ttl_days=None if connector.complete_listing else get_settings().search_listing_ttl_days)
         run.status = "ok"
         board.consecutive_failures = 0
         board.next_attempt_at = None

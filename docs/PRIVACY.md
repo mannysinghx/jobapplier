@@ -15,6 +15,12 @@
 
 No data is sent to any model or third party. The only outbound network calls are GET requests to enabled job-board APIs.
 
+## Job-alert email imports
+- You choose what to upload (.eml, .mbox or a .zip of .eml). Messages not sent from linkedin.com, indeed.com, ziprecruiter.com, dice.com or theladders.com are skipped **unread**, and nothing from them is stored.
+- From alert emails only the job fields are kept (title, company, location, salary line, link, email date, your mail provider's DKIM verdict). The raw email is never stored.
+- Links are never opened by the app. They must point at the site's own domain or they are dropped (phishing guard).
+- LinkedIn export: Saved Jobs and Job Applications are imported. Recruiter contact details and your question answers in the Job Applications CSV are **not** stored.
+
 ## Consent
 - Folder access needs an explicit consent checkbox. It is recorded with a timestamp, audited and revocable. Access is read-only, top-level PDF/DOCX only.
 - LinkedIn: only your URL and your own data export. The app never asks for your LinkedIn password.

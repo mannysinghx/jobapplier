@@ -6,6 +6,8 @@ A self-hosted, open-source platform that finds fresh jobs on **permitted** sourc
 
 ## What it does
 - **Profile & facts**: import a PDF/DOCX resume from a folder you consent to (read-only) or by upload, plus your own LinkedIn data-export ZIP. Facts are extracted with provenance (document + character span). Resume/LinkedIn conflicts are flagged. **Nothing is used until you approve it.**
+- **Job sites**: LinkedIn, Indeed, ZipRecruiter, Dice and Ladders via their **permitted** routes: Dice's official search connector, your own job-alert emails, your LinkedIn data export and manual adds. None of them allows automated applying, so those are handoffs.
+- **Local AI cover letters** (optional): a local Ollama model drafts from approved facts only. Every sentence is verified against the facts it cites, and anything unsupported is dropped.
 - **Continuous discovery**: poll employer job boards on a schedule with rate limits, backoff, health reporting, deduplication (same source and across sources) and expiry detection.
 - **Explainable matching**: title 25 / skills 25 / seniority 15 / location 15 / domain 10 / compensation 10 (configurable). Hard exclusions override the score. Every point cites evidence, and missing evidence costs points.
 - **Packets**: a tailored DOCX resume and cover letter built only from approved facts. Every line carries provenance. Form answers are drafted from your profile and approved standard answers. **Sensitive/legal questions are never inferred.**

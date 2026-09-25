@@ -239,6 +239,8 @@ def score_job(job: Job, prefs: Preferences, facts: list[Fact], today: date | Non
         comp["compensation"] = {"points": round(w["compensation"] * 0.5, 1), "max": w["compensation"]}
         notes.append("salary not disclosed")
 
+    if (job.meta or {}).get("summary_only"):
+        notes.append("only a summary is available: add or fetch the full description for a fuller match")
     if job.posted_at is not None:
         age = ((today or date.today()) - job.posted_at.date()).days
         if age > get_settings().listing_old_after_days:

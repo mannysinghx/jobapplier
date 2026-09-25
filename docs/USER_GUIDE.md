@@ -29,6 +29,20 @@ Enable a permitted source, then add employer **boards**. A board token is the co
 `boards.greenhouse.io/<token>`, `jobs.lever.co/<token>`, `jobs.ashbyhq.com/<token>`.
 **Poll now** fetches immediately. Otherwise the worker polls on your interval. Connector health shows failures and backoff.
 
+## 6b. LinkedIn, Indeed, ZipRecruiter, Dice, Ladders
+None of these five sites permits a third-party tool to scrape listings or to apply for you. Each term is quoted in [SOURCE_REGISTRY.md](SOURCE_REGISTRY.md). They are supported through permitted routes:
+- **Dice**: Sources → Search (Dice) → add a saved search (keyword, location, remote/hybrid/on-site, posted within). It polls Dice's official job-search server on your schedule. Only a summary comes back; press **Fetch full description from Dice** on a job you care about.
+- **Job-alert emails (all five)**: turn on job alerts on the sites. Then Import → upload the alert emails:
+  - Gmail: Google Takeout (.mbox), or open an email → ⋮ → Download message (.eml)
+  - Apple Mail: Mailbox → Export Mailbox (.mbox), or drag messages to Finder (.eml)
+  - Outlook: Save as .eml
+
+  Only emails from those five sites are read.
+- **LinkedIn data export**: the same ZIP you upload for your profile also imports your **Saved Jobs** and **Job Applications**. Past applications are recorded, so you're warned before applying to the same role again.
+- **Manual add**: paste a listing you're looking at (URL, title, company, optionally the description). If the link points to a Greenhouse/Lever/Ashby board, you're offered to follow that employer's board directly.
+
+Imported jobs usually have only a summary. Paste the full description from your browser for a fuller match. **Applying is always done by you on the site**, using the packet.
+
 ## 7. Applications
 States: DISCOVERED → MATCHED → PREPARED → NEEDS_REVIEW/APPROVED → SUBMITTED → CONFIRMED (plus REJECTED_BY_USER, BLOCKED_BY_POLICY, EXPIRED, DUPLICATE, FAILED, FOLLOW_UP).
 

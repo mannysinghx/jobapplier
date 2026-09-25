@@ -170,6 +170,8 @@ class SourceBoard(Base):
     source_key: Mapped[str] = mapped_column(ForeignKey("sources.key", ondelete="CASCADE"))
     board_token: Mapped[str] = mapped_column(String(120))
     employer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Search-based sources (e.g. Dice): the saved search, e.g. {"keyword": "...", "location": "..."}
+    params: Mapped[dict] = mapped_column(JSON, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -215,6 +217,8 @@ class Job(Base):
     canonical_url: Mapped[str | None] = mapped_column(String(600), nullable=True)
     apply_url: Mapped[str | None] = mapped_column(String(600), nullable=True)
     permission: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Source-specific extras: {"site": "linkedin", "summary_only": true, "dice_guid": "...", "dkim": "pass", ...}
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
     dedupe_key: Mapped[str] = mapped_column(String(64), index=True)
     content_hash: Mapped[str] = mapped_column(String(64))
     duplicate_of_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
